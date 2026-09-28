@@ -1,15 +1,13 @@
 import { useMemo } from 'react'
 import { useReducedMotion } from 'framer-motion'
-import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
+import { CHART_COLORS, tooltipStyle } from '../lib/chartSetup'
 import { monthName } from '../lib/dates'
 import { formatMoney } from '../lib/format'
 
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip)
-
-const ACCENT = '#5AC8FA'
-const ACCENT_DIM = 'rgba(90, 200, 250, 0.32)'
-const TEXT_2 = '#A9B6CE'
+const ACCENT = CHART_COLORS.accent
+const ACCENT_DIM = CHART_COLORS.accentDim
+const TEXT_2 = CHART_COLORS.text2
 
 /** Bars with what's committed in installments for each upcoming month. Tapping a bar selects it. */
 export default function CommittedChart({ months, selected, onSelect }) {
@@ -42,12 +40,7 @@ export default function CommittedChart({ months, selected, onSelect }) {
     plugins: {
       legend: { display: false },
       tooltip: {
-        displayColors: false,
-        backgroundColor: 'rgba(20, 34, 62, 0.95)',
-        borderColor: 'rgba(255,255,255,0.1)',
-        borderWidth: 1,
-        padding: 10,
-        cornerRadius: 12,
+        ...tooltipStyle,
         callbacks: { label: (ctx) => formatMoney(Math.round(ctx.parsed.y)) },
       },
     },

@@ -8,17 +8,17 @@ import { monthName } from '../lib/dates'
 import { expensesOfMonth } from '../lib/expenses'
 import { listContainer } from '../lib/motion'
 
-export default function AllMovementsSheet({ open, month, onClose, onOpenExpense }) {
+export default function AllMovementsSheet({ open, month, initialCategory, onClose, onOpenExpense }) {
   return (
     <Sheet open={open} onClose={onClose} labelledBy="all-title" space="personal" tall>
-      <AllMovements month={month} onClose={onClose} onOpenExpense={onOpenExpense} />
+      <AllMovements month={month} initialCategory={initialCategory} onClose={onClose} onOpenExpense={onOpenExpense} />
     </Sheet>
   )
 }
 
-function AllMovements({ month, onClose, onOpenExpense }) {
+function AllMovements({ month, initialCategory, onClose, onOpenExpense }) {
   const store = usePersonalStore()
-  const [categoryFilter, setCategoryFilter] = useState(null)
+  const [categoryFilter, setCategoryFilter] = useState(initialCategory ?? null)
   const [showVoided, setShowVoided] = useState(true)
 
   const all = expensesOfMonth(store.expenses, month)

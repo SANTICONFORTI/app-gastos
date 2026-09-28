@@ -17,7 +17,7 @@ import { listContainer, listItem } from '../lib/motion'
 const MAX_SEGMENTS = 5
 const RECENT_COUNT = 5
 
-export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onOpenPlan, onOpenInstallments, onSeeAll, onSoon, onNotice }) {
+export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onOpenPlan, onOpenInstallments, onOpenStats, onSeeAll, onNotice }) {
   const store = usePersonalStore()
   const rates = useDollarRates()
   const nextMonth = shiftMonth(monthKey(), 1)
@@ -69,7 +69,7 @@ export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense,
           <span className="btn-plus"><Plus size={13} strokeWidth={3.2} /></span>
           Agregar gasto
         </Pressable>
-        <Pressable className="btn btn-glass btn-lg action-btn" onClick={() => onSoon('Análisis (etapa 4)')}>
+        <Pressable className="btn btn-glass btn-lg action-btn" onClick={onOpenStats}>
           <BarChart3 size={16} strokeWidth={2.2} />
           Ver análisis
         </Pressable>

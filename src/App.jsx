@@ -24,7 +24,7 @@ const TABS = {
   personal: [
     { id: 'home', label: 'Inicio', Icon: Home },
     { id: 'installments', label: 'Cuotas', Icon: CreditCard },
-    { id: 'stats', label: 'Estadísticas', Icon: BarChart3, stage: 'etapa 4', title: 'Estadísticas' },
+    { id: 'stats', label: 'Estadísticas', Icon: BarChart3 },
     { id: 'profile', label: 'Perfil', Icon: UserRound, stage: 'etapa 5', title: 'Tu perfil' },
   ],
   group: [
@@ -39,6 +39,7 @@ const THEME_COLOR = { personal: '#0A1428', group: '#0E1230' }
 
 // Loaded on demand: it brings Chart.js, which the home screen doesn't need.
 const Installments = lazy(() => import('./screens/Installments'))
+const Stats = lazy(() => import('./screens/Stats'))
 
 // Personal slides in from the left, Group from the right.
 const slide = {
@@ -131,6 +132,7 @@ export default function App() {
                     onOpenExpense={(id) => setSheet({ type: 'detail', id })}
                     onOpenPlan={(id) => setSheet({ type: 'plan', id })}
                     onOpenInstallments={() => setTabs((t) => ({ ...t, personal: 'installments' }))}
+                    onOpenStats={() => setTabs((t) => ({ ...t, personal: 'stats' }))}
                     onSeeAll={() => setSheet({ type: 'all' })}
                     onSoon={soon}
                     onNotice={showToast}
@@ -143,6 +145,16 @@ export default function App() {
                   <Installments
                     onAddInstallments={() => setSheet({ type: 'expense', installments: true })}
                     onOpenPlan={(id) => setSheet({ type: 'plan', id })}
+                    onOpenExpense={(id) => setSheet({ type: 'detail', id })}
+                  />
+                </Suspense>
+              ) : space === 'personal' && activeTab === 'stats' ? (
+                <Suspense fallback={<div className="screen-loading" aria-busy="true" />}>
+                  <Stats
+                    month={month}
+                    onPickMonth={() => setSheet({ type: 'month' })}
+                    onChangeMonth={setMonth}
+                    onOpenCategory={(category) => setSheet({ type: 'all', category })}
                     onOpenExpense={(id) => setSheet({ type: 'detail', id })}
                   />
                 </Suspense>
@@ -189,6 +201,7 @@ export default function App() {
         <AllMovementsSheet
           open={sheet?.type === 'all'}
           month={month}
+          initialCategory={sheet?.type === 'all' ? sheet.category : undefined}
           onClose={closeSheet}
           onOpenExpense={(id) => setSheet({ type: 'detail', id })}
         />

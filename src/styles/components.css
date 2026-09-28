@@ -1500,6 +1500,167 @@ button.movement-btn:hover .movement:not(.movement-voided) { background: rgba(255
   gap: 12px;
 }
 
+/* ---------- Stage 4: statistics ---------- */
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.doughnut-wrap {
+  position: relative;
+  height: 220px;
+}
+
+.doughnut-canvas { position: absolute; inset: 0; }
+
+.doughnut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.doughnut-amount { font-size: 24px; }
+
+.cat-breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cat-breakdown-row {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 16px;
+  background: none;
+  text-align: left;
+}
+
+.cat-breakdown-row:hover { background: rgba(255, 255, 255, 0.03); }
+
+.cat-breakdown-name {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cat-breakdown-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stat-tile-wide {
+  grid-column: 1 / -1;
+  text-align: left;
+  width: 100%;
+}
+
+.stat-tile-wide .chip-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.change-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  min-width: 0;
+}
+
+.change-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.change-value.is-up, .change-badge.is-up { color: var(--warning); }
+.change-value.is-down, .change-badge.is-down { color: var(--online); }
+
+.compare-text { font-size: 14px; line-height: 1.45; }
+
+.info-line { display: flex; align-items: center; gap: 6px; }
+
+.change-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.change-row {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.change-name { flex-grow: 1; font-weight: 600; }
+
+.change-badge {
+  min-width: 78px;
+  justify-content: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.evolution-chart { position: relative; height: 200px; }
+
+.evolution-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.source-note {
+  font-size: 11px;
+  color: var(--text-2);
+  opacity: 0.8;
+}
+
 /* Invisible hit area so compact buttons still get a 44px touch target. */
 .switcher-option,
 .currency-option,
