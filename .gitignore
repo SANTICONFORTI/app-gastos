@@ -1,0 +1,28 @@
+# Dependencias (se reinstalan con npm install)
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+
+# Variables de entorno: NUNCA se suben
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / sistema
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# Configuración local de Claude
+.claude/settings.local.json

@@ -1,0 +1,164 @@
+/*
+ * Design system.
+ * Each space (personal / group) defines the same set of color variables.
+ * They are registered with @property so the browser can animate between
+ * them: switching space smoothly shifts accent, glow and text colors.
+ */
+
+@property --bg { syntax: '<color>'; inherits: true; initial-value: #0A1428; }
+@property --glow-1 { syntax: '<color>'; inherits: true; initial-value: #1B4C7C; }
+@property --glow-2 { syntax: '<color>'; inherits: true; initial-value: #0F2548; }
+@property --accent { syntax: '<color>'; inherits: true; initial-value: #5AC8FA; }
+@property --grad-a { syntax: '<color>'; inherits: true; initial-value: #7FD6FF; }
+@property --grad-b { syntax: '<color>'; inherits: true; initial-value: #3FB4EE; }
+@property --text-2 { syntax: '<color>'; inherits: true; initial-value: #A9B6CE; }
+@property --dim { syntax: '<color>'; inherits: true; initial-value: #4B5D80; }
+@property --on-accent { syntax: '<color>'; inherits: true; initial-value: #06121F; }
+@property --nav-bg { syntax: '<color>'; inherits: true; initial-value: rgba(20, 34, 62, 0.92); }
+
+:root {
+  --text: #F2F5FA;
+  --online: #4ADE80;
+  --warning: #FFB547;
+
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --glass-shine: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+
+  --font: -apple-system, 'SF Pro Display', 'SF Pro Text', Manrope, system-ui, sans-serif;
+  --space-transition: 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+
+  color-scheme: dark;
+}
+
+[data-space='personal'] {
+  --bg: #0A1428;
+  --glow-1: #1B4C7C;
+  --glow-2: #0F2548;
+  --accent: #5AC8FA;
+  --grad-a: #7FD6FF;
+  --grad-b: #3FB4EE;
+  --text-2: #A9B6CE;
+  --dim: #4B5D80;
+  --on-accent: #06121F;
+  --nav-bg: rgba(20, 34, 62, 0.92);
+}
+
+[data-space='group'] {
+  --bg: #0E1230;
+  --glow-1: #3D2F86;
+  --glow-2: #1D1B52;
+  --accent: #A78BFA;
+  --grad-a: #C2AEFF;
+  --grad-b: #9A7BF5;
+  --text-2: #C3C6E4;
+  --dim: #57558F;
+  --on-accent: #14092E;
+  --nav-bg: rgba(33, 30, 84, 0.92);
+}
+
+[data-space] {
+  transition:
+    --bg var(--space-transition),
+    --glow-1 var(--space-transition),
+    --glow-2 var(--space-transition),
+    --accent var(--space-transition),
+    --grad-a var(--space-transition),
+    --grad-b var(--space-transition),
+    --text-2 var(--space-transition),
+    --dim var(--space-transition),
+    --on-accent var(--space-transition),
+    --nav-bg var(--space-transition);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-space] { transition: none; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  background:
+    radial-gradient(130% 42% at 50% -8%, var(--glow-1) 0%, var(--glow-2) 45%, var(--bg) 75%) no-repeat,
+    var(--bg);
+  background-attachment: fixed;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, p { margin: 0; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+/* ---------- Surfaces ---------- */
+
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shine);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  color: var(--text);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--grad-a) 0%, var(--grad-b) 100%);
+  color: var(--on-accent);
+  font-weight: 800;
+  box-shadow:
+    0 10px 28px color-mix(in srgb, var(--accent) 38%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.btn-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shine);
+}
+
+.btn-icon {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.btn-lg { min-height: 52px; font-size: 14px; }
