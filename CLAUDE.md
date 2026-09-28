@@ -1,4 +1,6 @@
-# App de gastos personales y compartidos
+# Pooly — app de gastos personales y compartidos
+
+La app se llama **Pooly**. Usá ese nombre en todo lo que ve el usuario (títulos, pantallas, Wrapped, PWA). El proyecto de Supabase conserva su nombre interno `app-gastos`.
 
 Este archivo es el brief del proyecto. Leelo completo antes de hacer cualquier cosa y respetalo en cada sesión.
 

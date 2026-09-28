@@ -1,4 +1,4 @@
-# App de gastos
+# Pooly
 
 Web app (PWA) para controlar gastos personales y compartidos, hecha para Argentina: cuotas, eventos sin registro, dólar blue y tarjeta, y Wrapped para compartir.
 

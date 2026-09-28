@@ -75,7 +75,7 @@ export default function AuthScreen() {
     <motion.main className="auth" variants={listContainer} initial="hidden" animate="show">
       <motion.div variants={listItem} className="auth-brand">
         <span className="auth-logo" aria-hidden="true">$</span>
-        <h1 className="auth-title">Gastos</h1>
+        <h1 className="auth-title">Pooly</h1>
         <p className="auth-tagline">Tus gastos personales y compartidos, hechos para Argentina.</p>
       </motion.div>
 
