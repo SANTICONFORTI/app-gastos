@@ -9,10 +9,12 @@ export function splitAmount(value) {
   return { integer, decimals }
 }
 
-/** Short amount without decimals: 58400 -> '$ 58.400'. */
+/** Short amount: 58400 -> '$ 58.400'; shows cents only when there are any: '$ 12.500,50'. */
 export function formatMoney(value, currency = 'ARS') {
   const symbol = currency === 'USD' ? 'US$' : '$'
-  const n = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(value)
+  const rounded = Math.round(value * 100) / 100
+  const digits = Number.isInteger(rounded) ? 0 : 2
+  const n = new Intl.NumberFormat('es-AR', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(rounded)
   return `${symbol} ${n}`
 }
 

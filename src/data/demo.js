@@ -1,25 +1,4 @@
-// Sample data to preview the design during stage 1.
-// Replaced by real data in stage 2 (personal) and stage 6 (groups).
-
-export const demoPersonal = {
-  monthLabel: 'Septiembre',
-  total: 684200,
-  previousTotal: 610900,
-  blueRate: 1385,
-  antTotal: 41300,
-  byCategory: [
-    { categoryId: 'comida', amount: 239470 },
-    { categoryId: 'servicios', amount: 164210 },
-    { categoryId: 'transporte', amount: 136840 },
-    { categoryId: 'salidas', amount: 82100 },
-    { categoryId: 'otros', amount: 61580 },
-  ],
-  movements: [
-    { id: 'p1', title: 'Supermercado', detail: 'Hoy, 18:32 · con ticket', amount: 58400, categoryId: 'comida' },
-    { id: 'p2', title: 'SUBE', detail: 'Ayer, 09:10', amount: 15000, categoryId: 'transporte' },
-    { id: 'p3', title: 'Luz', detail: 'Lun 22, 11:05', amount: 42300, categoryId: 'servicios' },
-  ],
-}
+// Sample group data to preview the design. Replaced by real groups in stage 6.
 
 export const demoGroup = {
   name: 'Depto Palermo',

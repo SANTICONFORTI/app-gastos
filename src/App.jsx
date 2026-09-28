@@ -5,14 +5,19 @@ import {
 } from 'lucide-react'
 import SpaceSwitcher from './components/SpaceSwitcher'
 import BottomNav from './components/BottomNav'
-import NewExpenseSheet from './components/NewExpenseSheet'
+import ExpenseSheet from './components/ExpenseSheet'
+import ExpenseDetailSheet from './components/ExpenseDetailSheet'
+import MonthPickerSheet from './components/MonthPickerSheet'
+import AllMovementsSheet from './components/AllMovementsSheet'
 import Pressable from './components/Pressable'
 import Avatar from './components/Avatar'
 import Toast from './components/Toast'
 import PersonalHome from './screens/PersonalHome'
 import GroupHome from './screens/GroupHome'
 import ComingSoon from './screens/ComingSoon'
+import { usePersonalStore } from './store/PersonalStore'
 import { demoGroup } from './data/demo'
+import { monthKey } from './lib/dates'
 
 const TABS = {
   personal: [
@@ -39,9 +44,12 @@ const slide = {
 }
 
 export default function App() {
+  const { saveError } = usePersonalStore()
   const [space, setSpace] = useState('personal')
   const [tabs, setTabs] = useState({ personal: 'home', group: 'home' })
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [month, setMonth] = useState(monthKey())
+  // Only one sheet at a time: { type: 'expense', expense? } | { type: 'detail', id } | { type: 'month' } | { type: 'all' }
+  const [sheet, setSheet] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
 
@@ -55,17 +63,21 @@ export default function App() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[space])
   }, [space])
 
+  useEffect(() => {
+    if (saveError) showToast('No pudimos guardar en este dispositivo: el almacenamiento está lleno')
+  }, [saveError])
+
   function showToast(message) {
     clearTimeout(toastTimer.current)
     setToast(message)
-    toastTimer.current = setTimeout(() => setToast(null), 2600)
+    toastTimer.current = setTimeout(() => setToast(null), 2800)
   }
 
   const soon = (what) => showToast(`${what}: próximamente`)
-
-  function handleSave() {
-    setSheetOpen(false)
-    showToast('Guardar gastos llega en la etapa 2')
+  const closeSheet = () => setSheet(null)
+  const finish = (message) => {
+    setSheet(null)
+    showToast(message)
   }
 
   return (
@@ -107,7 +119,15 @@ export default function App() {
             >
               {activeTab === 'home' ? (
                 space === 'personal' ? (
-                  <PersonalHome onAdd={() => setSheetOpen(true)} onSoon={soon} />
+                  <PersonalHome
+                    month={month}
+                    onPickMonth={() => setSheet({ type: 'month' })}
+                    onAdd={() => setSheet({ type: 'expense' })}
+                    onOpenExpense={(id) => setSheet({ type: 'detail', id })}
+                    onSeeAll={() => setSheet({ type: 'all' })}
+                    onSoon={soon}
+                    onNotice={showToast}
+                  />
                 ) : (
                   <GroupHome onSoon={soon} />
                 )
@@ -122,17 +142,32 @@ export default function App() {
           tabs={TABS[space]}
           activeTab={activeTab}
           onTabChange={(id) => setTabs((t) => ({ ...t, [space]: id }))}
-          onAdd={() => setSheetOpen(true)}
+          onAdd={() => setSheet({ type: 'expense' })}
           addLabel={space === 'group' ? 'Nuevo gasto del grupo' : 'Nuevo gasto'}
         />
 
-        <NewExpenseSheet
-          open={sheetOpen}
+        <ExpenseSheet
+          open={sheet?.type === 'expense'}
+          expense={sheet?.type === 'expense' ? sheet.expense : undefined}
           initialSpace={space}
           groupName={demoGroup.name}
           groupSize={demoGroup.members.length}
-          onClose={() => setSheetOpen(false)}
-          onSave={handleSave}
+          onClose={closeSheet}
+          onDone={finish}
+          onNotice={showToast}
+        />
+        <ExpenseDetailSheet
+          expenseId={sheet?.type === 'detail' ? sheet.id : null}
+          onClose={closeSheet}
+          onEdit={(expense) => setSheet({ type: 'expense', expense })}
+          onDone={finish}
+        />
+        <MonthPickerSheet open={sheet?.type === 'month'} value={month} onChange={setMonth} onClose={closeSheet} />
+        <AllMovementsSheet
+          open={sheet?.type === 'all'}
+          month={month}
+          onClose={closeSheet}
+          onOpenExpense={(id) => setSheet({ type: 'detail', id })}
         />
 
         <Toast message={toast} />
