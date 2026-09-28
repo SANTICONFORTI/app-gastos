@@ -1,6 +1,6 @@
-# Pooly — app de gastos personales y compartidos
+# Puly — app de gastos personales y compartidos
 
-La app se llama **Pooly**. Usá ese nombre en todo lo que ve el usuario (títulos, pantallas, Wrapped, PWA). El proyecto de Supabase conserva su nombre interno `app-gastos`.
+La app se llama **Puly** (dirección: `puly.vercel.app`). Usá ese nombre en todo lo que ve el usuario (títulos, pantallas, Wrapped, PWA). El proyecto de Supabase y el repo conservan su nombre interno `app-gastos`.
 
 Este archivo es el brief del proyecto. Leelo completo antes de hacer cualquier cosa y respetalo en cada sesión.
 
@@ -225,6 +225,6 @@ Estilo: minimalista, oscuro, tipo Apple, con influencia de apps fintech modernas
 9. **Wrapped**: resumen mensual y anual (personal y de grupo) para compartir como imagen.
 10. **Extras**: metas de ahorro, gastos recurrentes, presupuestos, recordatorios, notificaciones, exportar a Excel/PDF y PWA instalable.
 
-Deploy: el proyecto ya está conectado a Vercel (`app-gastos-rosy.vercel.app`) con las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` cargadas. Cada push a `main` publica solo. Cuando la app esté online, configurar en Supabase (Authentication → URL Configuration) la dirección de Vercel como Site URL y Redirect URL.
+Deploy: el proyecto ya está conectado a Vercel (dirección principal `puly.vercel.app`; también responde `app-gastos-rosy.vercel.app`) con las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` cargadas. Cada push a `main` publica solo. Cuando la app esté online, configurar en Supabase (Authentication → URL Configuration) la dirección de Vercel como Site URL y Redirect URL.
 
 Empezá por la **etapa 1**.
