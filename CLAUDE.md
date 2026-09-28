@@ -137,8 +137,9 @@ Además: personal y grupos en una sola app, transparencia total (nada se borra),
 
 - Proyecto: **app-gastos** (id `lugdaqxmcxafekcjjktw`, región São Paulo, plan gratis). No crear otro.
 - La URL del proyecto y la clave pública (anon/publishable) se sacan del panel de Supabase (Project Settings → API) y van en `.env` como `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
-- Ya aplicadas 5 migraciones: tablas, funciones/triggers, RLS, buckets de Storage y categorías por defecto + Realtime. Antes de cambiar el esquema, revisá lo existente y creá migraciones nuevas (no edites las viejas).
-- Pendiente: correr el asesor de seguridad de Supabase y revisar sus avisos. Activar el login con Google en Authentication → Providers cuando llegue la etapa 4.
+- Ya aplicadas 8 migraciones: 01-05 (tablas, funciones/triggers, RLS, buckets de Storage y categorías por defecto + Realtime), 06 (funciones auxiliares de RLS movidas al esquema `private`, fuera de la API), 07 (cuotas: `installment_plans`, `installment_plan_history`, columnas de cuota en `expenses` y RPC `create_installment_plan`, `edit_installment_plan`, `void_installment_plan`), 08 (permisos de funciones trigger). Desde la 06 se guardan también en `supabase/migrations/`. Antes de cambiar el esquema, revisá lo existente y creá migraciones nuevas (no edites las viejas).
+- Asesor de seguridad revisado (etapa 5): quedan solo 3 avisos esperables (las RPC de invitaciones, que la app llama a propósito). Volver a correrlo después de cada migración.
+- Login con Google: hay que activarlo en Authentication → Providers (requiere un cliente OAuth gratis de Google Cloud). El SMTP que trae Supabase solo manda mails a miembros del equipo: para usuarios reales, desactivar "Confirm email" o configurar un SMTP propio gratuito.
 - Funciones listas para usar desde el frontend (RPC): `preview_invite(invite_code)`, `join_group_with_code(invite_code)`, `respond_group_invite(gid, accept)`.
 - Triggers que ya funcionan solos: se crea el perfil al registrarse, quien crea un grupo queda admin, historial automático de cada alta/edición/anulación, y bloqueo de cambios a movimientos o pagos anulados.
 - Rutas de Storage: `avatars/users/{uid}/...`, `avatars/groups/{group_id}/...`, `receipts/users/{uid}/...`, `receipts/groups/{group_id}/...`. Los tickets no se pueden reemplazar ni borrar.
@@ -157,8 +158,9 @@ Además: personal y grupos en una sola app, transparencia total (nada se borra),
 - `settlements`: id, group_id, from_user, to_user, amount, currency, created_at.
 - `recurring_expenses`, `budgets`, `savings_goals`: según cada etapa.
 
+- `installment_plans` (creada en la etapa 5): compra en cuotas; cada cuota es una fila de `expenses` con `installment_plan_id` e `installment_number`, fechada en su mes. Por ahora solo personales; las de grupo llegan con la etapa 6.
+
 **Pendiente de crear (migraciones nuevas, cuando llegue su etapa)** — propuesta, ajustable:
-- Cuotas: `installment_plans` (compra, total, cantidad de cuotas, primera cuota, tarjeta) y que cada cuota sea un movimiento en `expenses` con `installment_plan_id` e `installment_number`, así cada una cae en su mes y respeta anulación e historial.
 - Eventos: `events` (id, group_id nullable para eventos sueltos, name, date, status `open` | `closed`, created_by, share_token, share_active), `event_participants` (event_id, user_id nullable, guest_name nullable, claimed_by nullable) y `event_id` opcional en `expenses`. Los splits de evento apuntan a `event_participants` para poder incluir invitados.
 - Pagos informados: estado `reported` → `confirmed` para pagos hechos desde el link público.
 - Vista pública por link: funciones `security definer` que reciben el `share_token` (ej. `get_public_event(token)`, `report_guest_payment(token, participant_id, amount)`), con validaciones y límites. Nada de acceso directo de `anon` a las tablas.

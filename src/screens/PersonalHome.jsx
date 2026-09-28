@@ -6,6 +6,7 @@ import CategoryIcon from '../components/CategoryIcon'
 import DonutChart from '../components/DonutChart'
 import PersonalMovementRow from '../components/PersonalMovementRow'
 import Pressable from '../components/Pressable'
+import LocalImportCard from '../components/LocalImportCard'
 import { usePersonalStore } from '../store/PersonalStore'
 import useDollarRates from '../hooks/useDollarRates'
 import { monthKey, monthName, shiftMonth } from '../lib/dates'
@@ -58,6 +59,8 @@ export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense,
           {monthName(month, { capitalize: true, short: true })} <ChevronDown size={14} strokeWidth={2.5} />
         </Pressable>
       </motion.section>
+
+      <LocalImportCard onNotice={onNotice} />
 
       <motion.div variants={listItem} className="chip-grid">
         {rateChip('blue', 'Dólar blue', '#4ADE80', DollarSign)}

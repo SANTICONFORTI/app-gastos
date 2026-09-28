@@ -13,8 +13,8 @@ import { amountToInput, formatAmountInput, parseAmountInput } from '../lib/amoun
 import { dateInputToIso, monthKey, monthLabelWithYear, shiftMonth, toDateInput } from '../lib/dates'
 import { formatMoney } from '../lib/format'
 import { splitInstallments } from '../lib/installments'
-import { compressImage, saveReceipt } from '../lib/receipts'
-import { newId } from '../lib/id'
+import { compressImage } from '../lib/receipts'
+import { friendlyError } from '../lib/db'
 import { softSpring } from '../lib/motion'
 
 const QUICK_COUNTS = [3, 6, 12, 18, 24]
@@ -60,7 +60,8 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
   const [rateType, setRateType] = useState(expense?.rateType ?? 'blue')
   const [manualRate, setManualRate] = useState('')
   const [amountText, setAmountText] = useState(expense ? amountToInput(expense.amount) : '')
-  const [categoryId, setCategoryId] = useState(expense?.categoryId ?? 'comida')
+  const [categoryId, setCategoryId] = useState(expense?.categoryId ?? store.categories[0]?.id ?? null)
+  const uploadedReceipt = useRef(null)
   const [date, setDate] = useState(toDateInput(expense?.spentAt ?? new Date()))
   const [note, setNote] = useState(expense?.note ?? '')
   const [receiptBlob, setReceiptBlob] = useState(null)
@@ -117,6 +118,7 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
     try {
       const blob = await compressImage(file)
       setReceiptBlob(blob)
+      uploadedReceipt.current = null
       setReceiptPreview(URL.createObjectURL(blob))
     } catch {
       setError('No pudimos leer esa foto. Probá con otra.')
@@ -146,16 +148,29 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
     setSaving(true)
     let receiptId = expense?.receiptId ?? null
     if (receiptBlob) {
-      try {
-        receiptId = newId()
-        await saveReceipt(receiptId, receiptBlob)
-      } catch {
-        setSaving(false)
-        setError('No pudimos guardar la foto del ticket. Probá de nuevo.')
-        return
+      // Receipts can't be deleted: if saving fails after uploading, a retry reuses the same file.
+      receiptId = uploadedReceipt.current
+      if (!receiptId) {
+        try {
+          receiptId = await store.uploadReceipt(receiptBlob)
+          uploadedReceipt.current = receiptId
+        } catch (err) {
+          setSaving(false)
+          setError(`No pudimos subir la foto del ticket. ${friendlyError(err)}`)
+          return
+        }
       }
     }
 
+    try {
+      await save(receiptId)
+    } catch (err) {
+      setSaving(false)
+      setError(friendlyError(err))
+    }
+  }
+
+  async function save(receiptId) {
     const common = {
       currency,
       exchangeRate: rate,
@@ -166,7 +181,7 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
     }
 
     if (inInstallments) {
-      store.addInstallmentPlan({
+      await store.addInstallmentPlan({
         ...common,
         totalAmount,
         installmentCount: count,
@@ -186,10 +201,10 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
         : dateInputToIso(date, editing ? expense.spentAt : new Date()),
     }
     if (editing) {
-      const changed = store.editExpense(expense.id, data)
+      const changed = await store.editExpense(expense.id, data)
       onDone(changed ? 'Cambios guardados' : 'No hubo cambios')
     } else {
-      store.addExpense(data)
+      await store.addExpense(data)
       onDone('Gasto guardado')
     }
   }
@@ -458,13 +473,15 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
         <span className="sheet-save-check"><Check size={14} strokeWidth={3.2} /></span>
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
-            key={`${dest}-${editing}-${inInstallments}`}
+            key={`${dest}-${editing}-${inInstallments}-${saving}`}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={softSpring}
           >
-            {editing
+            {saving
+              ? 'Guardando…'
+              : editing
               ? 'Guardar cambios'
               : isGroup
                 ? `Guardar en ${groupName}`

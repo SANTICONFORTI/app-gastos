@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   LayoutGrid, Bell, Home, BarChart3, CreditCard, UserRound, Users, History,
 } from 'lucide-react'
@@ -11,8 +11,11 @@ import MonthPickerSheet from './components/MonthPickerSheet'
 import AllMovementsSheet from './components/AllMovementsSheet'
 import PlanDetailSheet from './components/PlanDetailSheet'
 import Pressable from './components/Pressable'
-import Avatar from './components/Avatar'
+import UserAvatar from './components/UserAvatar'
 import Toast from './components/Toast'
+import ProfileScreen from './screens/ProfileScreen'
+import StatusScreen from './screens/StatusScreen'
+import { useAuth } from './store/AuthProvider'
 import PersonalHome from './screens/PersonalHome'
 import GroupHome from './screens/GroupHome'
 import ComingSoon from './screens/ComingSoon'
@@ -25,7 +28,7 @@ const TABS = {
     { id: 'home', label: 'Inicio', Icon: Home },
     { id: 'installments', label: 'Cuotas', Icon: CreditCard },
     { id: 'stats', label: 'Estadísticas', Icon: BarChart3 },
-    { id: 'profile', label: 'Perfil', Icon: UserRound, stage: 'etapa 5', title: 'Tu perfil' },
+    { id: 'profile', label: 'Perfil', Icon: UserRound },
   ],
   group: [
     { id: 'home', label: 'Inicio del grupo', Icon: Home },
@@ -49,7 +52,8 @@ const slide = {
 }
 
 export default function App() {
-  const { saveError } = usePersonalStore()
+  const store = usePersonalStore()
+  const { profile } = useAuth()
   const [space, setSpace] = useState('personal')
   const [tabs, setTabs] = useState({ personal: 'home', group: 'home' })
   const [month, setMonth] = useState(monthKey())
@@ -69,10 +73,6 @@ export default function App() {
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[space])
   }, [space])
 
-  useEffect(() => {
-    if (saveError) showToast('No pudimos guardar en este dispositivo: el almacenamiento está lleno')
-  }, [saveError])
-
   function showToast(message) {
     clearTimeout(toastTimer.current)
     setToast(message)
@@ -86,8 +86,20 @@ export default function App() {
     showToast(message)
   }
 
+  if (store.status !== 'ready') {
+    return store.status === 'loading'
+      ? <StatusScreen loading />
+      : (
+        <StatusScreen
+          title="No pudimos cargar tus gastos"
+          text="Revisá tu conexión a internet y probá de nuevo."
+          action={{ label: 'Reintentar', onClick: store.reload }}
+        />
+      )
+  }
+
   return (
-    <MotionConfig reducedMotion="user">
+    <>
       <div className="app">
         <header className="topbar">
           <Pressable className="btn btn-glass btn-icon" aria-label="Menú" onClick={() => soon('Menú')}>
@@ -98,7 +110,7 @@ export default function App() {
             {space === 'personal' ? (
               <motion.span key="avatar" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }}>
                 <Pressable className="avatar-btn" aria-label="Tu perfil" onClick={() => setTabs((t) => ({ ...t, personal: 'profile' }))}>
-                  <Avatar initials="TU" color="var(--accent)" size={44} ring="rgba(255,255,255,.25)" label="Tu perfil" />
+                  <UserAvatar profile={profile} size={44} ring="rgba(255,255,255,.25)" />
                 </Pressable>
               </motion.span>
             ) : (
@@ -134,7 +146,6 @@ export default function App() {
                     onOpenInstallments={() => setTabs((t) => ({ ...t, personal: 'installments' }))}
                     onOpenStats={() => setTabs((t) => ({ ...t, personal: 'stats' }))}
                     onSeeAll={() => setSheet({ type: 'all' })}
-                    onSoon={soon}
                     onNotice={showToast}
                   />
                 ) : (
@@ -158,6 +169,8 @@ export default function App() {
                     onOpenExpense={(id) => setSheet({ type: 'detail', id })}
                   />
                 </Suspense>
+              ) : space === 'personal' && activeTab === 'profile' ? (
+                <ProfileScreen onNotice={showToast} />
               ) : (
                 <ComingSoon Icon={tabInfo.Icon} title={tabInfo.title} stage={tabInfo.stage} />
               )}
@@ -208,6 +221,6 @@ export default function App() {
 
         <Toast message={toast} />
       </div>
-    </MotionConfig>
+    </>
   )
 }

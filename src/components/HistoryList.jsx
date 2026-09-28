@@ -27,12 +27,14 @@ function describe(field, value, getCategory) {
 }
 
 /** Timeline of created / edited / voided entries for an expense or an installment purchase. */
-export default function HistoryList({ entries, getCategory }) {
+export default function HistoryList({ entries, status = 'ready', getCategory }) {
   return (
-    <section aria-labelledby="history-title" className="history">
+    <section aria-labelledby="history-title" className="history" aria-busy={status === 'loading'}>
       <h2 id="history-title" className="card-title history-title">
         <History size={16} strokeWidth={2} aria-hidden="true" /> Historial
       </h2>
+      {status === 'loading' && entries.length === 0 && <p className="muted-sm">Cargando historial…</p>}
+      {status === 'error' && <p className="muted-sm">No pudimos cargar el historial. Revisá tu conexión.</p>}
       <ol className="history-list">
         {entries.map((h) => <HistoryItem key={h.id} entry={h} getCategory={getCategory} />)}
       </ol>

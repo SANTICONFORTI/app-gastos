@@ -1,240 +1,172 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { Tag } from 'lucide-react'
-import { CATEGORIES } from '../data/categories'
+import { supabase } from '../lib/supabase'
+import { fromCategoryRow, fromExpenseRow, fromPlanRow, normalizeExpenseHistory, normalizePlanHistory, toExpenseRow } from '../lib/db'
+import { iconFor } from '../data/categories'
 import { newId } from '../lib/id'
-import { monthKey, shiftMonth } from '../lib/dates'
-import { installmentDate, splitInstallments } from '../lib/installments'
+import { useAuth } from './AuthProvider'
 
-// Personal expenses, stored in this browser until stage 5 moves them to Supabase.
-// Field names mirror the `expenses` / `expense_history` / `installment_plans` tables to ease that migration.
-// Nothing is deleted: expenses are voided, and every change is recorded in history.
-//
-// Installment purchases: one plan + one expense per installment, dated in its own month,
-// so each month's summary only counts that month's installment.
-
-const STORAGE_KEY = 'gastos:personal:v1'
-
-/** Fields the user can change; history records before/after of these. */
-export const TRACKED_FIELDS = ['amount', 'currency', 'exchangeRate', 'rateType', 'categoryId', 'note', 'spentAt', 'receiptId']
-const PLAN_FIELDS = ['categoryId', 'note', 'card']
-
-const empty = { expenses: [], history: [], categories: [], plans: [] }
-
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? { ...empty, ...JSON.parse(raw) } : empty
-  } catch {
-    return empty
-  }
-}
-
-const pick = (obj, keys) => Object.fromEntries(keys.map((k) => [k, obj[k] ?? null]))
-const historyEntry = (fields) => ({ id: newId(), changedAt: new Date().toISOString(), ...fields })
+// Personal expenses, stored in Supabase. The database enforces the rules
+// (RLS, nothing is deleted, history written by triggers); this store keeps a local copy
+// for the screens and exposes async actions that throw friendly errors.
 
 const PersonalContext = createContext(null)
 
 export function PersonalStoreProvider({ children }) {
-  const [state, setState] = useState(load)
-  const [saveError, setSaveError] = useState(false)
+  const { user } = useAuth()
+  const [data, setData] = useState({ expenses: [], plans: [], categories: [] })
+  const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'error'
+  const [loadError, setLoadError] = useState(null)
+
+  const load = useCallback(async () => {
+    const [cats, exps, plans] = await Promise.all([
+      supabase.from('categories').select('*').order('sort_order').order('created_at'),
+      supabase.from('expenses').select('*').eq('owner_id', user.id).is('group_id', null).order('spent_at', { ascending: false }),
+      supabase.from('installment_plans').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }),
+    ])
+    const error = cats.error || exps.error || plans.error
+    if (error) {
+      setLoadError(error)
+      setStatus((s) => (s === 'ready' ? s : 'error'))
+      return
+    }
+    setData({
+      categories: cats.data.map(fromCategoryRow),
+      expenses: exps.data.map(fromExpenseRow),
+      plans: plans.data.map(fromPlanRow),
+    })
+    setLoadError(null)
+    setStatus('ready')
+  }, [user.id])
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-      setSaveError(false)
-    } catch {
-      setSaveError(true)
-    }
-  }, [state])
+    load()
+    // Pick up changes made on another device when coming back to the app.
+    const onVisible = () => document.visibilityState === 'visible' && load()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [load])
 
-  const addExpense = useCallback((data) => {
-    const expense = {
-      id: newId(),
-      ...pick(data, TRACKED_FIELDS),
-      installmentPlanId: null,
-      installmentNumber: null,
-      status: 'active',
-      voidedAt: null,
-      voidReason: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: null,
-    }
-    setState((s) => ({
-      ...s,
-      expenses: [...s.expenses, expense],
-      history: [...s.history, historyEntry({ expenseId: expense.id, action: 'created', before: null, after: pick(expense, TRACKED_FIELDS) })],
-    }))
-    return expense
-  }, [])
+  const replaceExpense = (row) => setData((d) => ({
+    ...d,
+    expenses: d.expenses.some((e) => e.id === row.id)
+      ? d.expenses.map((e) => (e.id === row.id ? fromExpenseRow(row) : e))
+      : [fromExpenseRow(row), ...d.expenses],
+  }))
 
-  /** Returns false if nothing changed. Voided expenses and installments can't be edited here. */
-  const editExpense = useCallback((id, changes) => {
-    const current = state.expenses.find((e) => e.id === id)
+  const addExpense = useCallback(async (input) => {
+    const { data: row, error } = await supabase
+      .from('expenses')
+      .insert({ ...toExpenseRow(input), owner_id: user.id })
+      .select()
+      .single()
+    if (error) throw error
+    replaceExpense(row)
+    return fromExpenseRow(row)
+  }, [user.id])
+
+  /** Returns false if nothing changed. */
+  const editExpense = useCallback(async (id, changes) => {
+    const current = data.expenses.find((e) => e.id === id)
     if (!current || current.status !== 'active' || current.installmentPlanId) return false
-    const changedKeys = TRACKED_FIELDS.filter((k) => k in changes && (changes[k] ?? null) !== (current[k] ?? null))
-    if (changedKeys.length === 0) return false
-    const now = new Date().toISOString()
-    const before = pick(current, changedKeys)
-    const after = pick(changes, changedKeys)
-    setState((s) => ({
-      ...s,
-      expenses: s.expenses.map((e) => (e.id === id ? { ...e, ...after, updatedAt: now } : e)),
-      history: [...s.history, historyEntry({ expenseId: id, action: 'edited', before, after })],
+    const changed = Object.fromEntries(Object.entries(changes).filter(([k, v]) => {
+      const a = k === 'note' ? (v?.trim() || '') : v ?? null
+      const b = current[k] ?? (k === 'note' ? '' : null)
+      return k === 'spentAt' ? Date.parse(a) !== Date.parse(b) : a !== b
     }))
+    if (Object.keys(changed).length === 0) return false
+    const { data: row, error } = await supabase.from('expenses').update(toExpenseRow(changed)).eq('id', id).select().single()
+    if (error) throw error
+    replaceExpense(row)
     return true
-  }, [state.expenses])
+  }, [data.expenses])
 
-  const voidExpense = useCallback((id, reason) => {
-    const trimmed = reason.trim()
-    if (!trimmed) throw new Error('El motivo es obligatorio')
-    const now = new Date().toISOString()
-    setState((s) => ({
-      ...s,
-      expenses: s.expenses.map((e) => (e.id === id && e.status === 'active' && !e.installmentPlanId
-        ? { ...e, status: 'voided', voidedAt: now, voidReason: trimmed }
-        : e)),
-      history: [...s.history, historyEntry({ expenseId: id, action: 'voided', before: { status: 'active' }, after: { status: 'voided', voidReason: trimmed } })],
-    }))
+  const voidExpense = useCallback(async (id, reason) => {
+    const { data: row, error } = await supabase
+      .from('expenses')
+      .update({ status: 'voided', void_reason: reason.trim() })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    replaceExpense(row)
   }, [])
 
-  /**
-   * data: { totalAmount, installmentCount, firstMonth, card, currency, exchangeRate, rateType,
-   *         categoryId, note, receiptId, purchasedAt }
-   */
-  const addInstallmentPlan = useCallback((data) => {
-    const now = new Date().toISOString()
-    const plan = {
-      id: newId(),
-      totalAmount: data.totalAmount,
-      installmentCount: data.installmentCount,
-      firstMonth: data.firstMonth,
-      card: data.card || null,
-      currency: data.currency,
-      exchangeRate: data.exchangeRate,
-      rateType: data.rateType,
-      categoryId: data.categoryId,
-      note: data.note,
-      receiptId: data.receiptId,
-      purchasedAt: data.purchasedAt,
-      status: 'active',
-      voidedAt: null,
-      voidReason: null,
-      createdAt: now,
-    }
-    const amounts = splitInstallments(plan.totalAmount, plan.installmentCount)
-    const installments = amounts.map((amount, i) => ({
-      id: newId(),
-      amount,
-      currency: plan.currency,
-      exchangeRate: plan.exchangeRate,
-      rateType: plan.rateType,
-      categoryId: plan.categoryId,
-      note: plan.note,
-      spentAt: installmentDate(plan.purchasedAt, shiftMonth(plan.firstMonth, i)),
-      receiptId: null,
-      installmentPlanId: plan.id,
-      installmentNumber: i + 1,
-      status: 'active',
-      voidedAt: null,
-      voidReason: null,
-      createdAt: now,
-      updatedAt: null,
-    }))
-    setState((s) => ({
-      ...s,
-      plans: [...s.plans, plan],
-      expenses: [...s.expenses, ...installments],
-      history: [
-        ...s.history,
-        historyEntry({ planId: plan.id, action: 'created', before: null, after: pick(plan, ['totalAmount', 'installmentCount', 'firstMonth', ...PLAN_FIELDS]) }),
-      ],
-    }))
-    return plan
-  }, [])
-
-  /** Changes category, description or card of a purchase; applied to all its non-voided installments. */
-  const editInstallmentPlan = useCallback((planId, changes) => {
-    const plan = state.plans.find((p) => p.id === planId)
-    if (!plan || plan.status !== 'active') return false
-    const changedKeys = PLAN_FIELDS.filter((k) => k in changes && (changes[k] || null) !== (plan[k] || null))
-    if (changedKeys.length === 0) return false
-    const now = new Date().toISOString()
-    const before = pick(plan, changedKeys)
-    const after = Object.fromEntries(changedKeys.map((k) => [k, changes[k] || null]))
-    const expenseChanges = pick(after, changedKeys.filter((k) => k !== 'card'))
-    setState((s) => ({
-      ...s,
-      plans: s.plans.map((p) => (p.id === planId ? { ...p, ...after } : p)),
-      expenses: Object.keys(expenseChanges).length === 0
-        ? s.expenses
-        : s.expenses.map((e) => (e.installmentPlanId === planId && e.status === 'active'
-          ? { ...e, ...expenseChanges, updatedAt: now }
-          : e)),
-      history: [...s.history, historyEntry({ planId, action: 'edited', before, after })],
-    }))
-    return true
-  }, [state.plans])
-
-  /**
-   * Voids a purchase: installments from next month on are voided; this month's and past ones
-   * were already charged, so they stay as they are.
-   */
-  const voidInstallmentPlan = useCallback((planId, reason) => {
-    const trimmed = reason.trim()
-    if (!trimmed) throw new Error('El motivo es obligatorio')
-    const now = new Date().toISOString()
-    const current = monthKey()
-    setState((s) => {
-      const toVoid = s.expenses.filter((e) =>
-        e.installmentPlanId === planId && e.status === 'active' && monthKey(e.spentAt) > current)
-      const ids = new Set(toVoid.map((e) => e.id))
-      const installmentReason = `Compra anulada: ${trimmed}`
-      return {
-        ...s,
-        plans: s.plans.map((p) => (p.id === planId && p.status === 'active'
-          ? { ...p, status: 'voided', voidedAt: now, voidReason: trimmed }
-          : p)),
-        expenses: s.expenses.map((e) => (ids.has(e.id)
-          ? { ...e, status: 'voided', voidedAt: now, voidReason: installmentReason }
-          : e)),
-        history: [
-          ...s.history,
-          historyEntry({ planId, action: 'voided', before: { status: 'active' }, after: { status: 'voided', voidReason: trimmed, voidedInstallments: toVoid.length } }),
-          ...toVoid.map((e) => historyEntry({ expenseId: e.id, action: 'voided', before: { status: 'active' }, after: { status: 'voided', voidReason: installmentReason } })),
-        ],
-      }
+  /** Returns the new plan id. `reload: false` skips refreshing (bulk imports reload once at the end). */
+  const addInstallmentPlan = useCallback(async (input, { reload = true } = {}) => {
+    const { data: planId, error } = await supabase.rpc('create_installment_plan', {
+      p_total_amount: input.totalAmount,
+      p_installment_count: input.installmentCount,
+      p_first_month: `${input.firstMonth}-01`,
+      p_purchased_at: input.purchasedAt,
+      p_currency: input.currency,
+      p_exchange_rate: input.exchangeRate,
+      p_rate_type: input.rateType,
+      p_category_id: input.categoryId,
+      p_note: input.note || null,
+      p_card: input.card || null,
+      p_receipt_path: input.receiptId,
     })
-  }, [])
+    if (error) throw error
+    if (reload) await load()
+    return planId
+  }, [load])
 
-  const addCategory = useCallback(({ name, color }) => {
-    const category = { id: `custom-${newId()}`, name: name.trim(), color }
-    setState((s) => ({ ...s, categories: [...s.categories, category] }))
-    return category
-  }, [])
+  const editInstallmentPlan = useCallback(async (planId, { categoryId, note, card }) => {
+    const { data: changed, error } = await supabase.rpc('edit_installment_plan', {
+      p_plan_id: planId, p_category_id: categoryId, p_note: note, p_card: card,
+    })
+    if (error) throw error
+    if (changed) await load()
+    return changed
+  }, [load])
+
+  const voidInstallmentPlan = useCallback(async (planId, reason, { reload = true } = {}) => {
+    const { data: count, error } = await supabase.rpc('void_installment_plan', { p_plan_id: planId, p_reason: reason })
+    if (error) throw error
+    if (reload) await load()
+    return count
+  }, [load])
+
+  const addCategory = useCallback(async ({ name, color }) => {
+    const { data: row, error } = await supabase
+      .from('categories')
+      .insert({ owner_id: user.id, name: name.trim(), color, icon: 'tag', sort_order: 100 })
+      .select()
+      .single()
+    if (error) throw error
+    const category = fromCategoryRow(row)
+    setData((d) => ({ ...d, categories: [...d.categories, category] }))
+    return { ...category, Icon: iconFor(category.icon) }
+  }, [user.id])
+
+  /** Uploads a compressed receipt photo; returns its storage path. Receipts are never replaced. */
+  const uploadReceipt = useCallback(async (blob) => {
+    const path = `users/${user.id}/${newId()}.jpg`
+    const { error } = await supabase.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg', upsert: false })
+    if (error) throw error
+    return path
+  }, [user.id])
 
   const value = useMemo(() => {
-    const categories = [...CATEGORIES, ...state.categories.map((c) => ({ ...c, Icon: Tag, custom: true }))]
+    const categories = data.categories.map((c) => ({ ...c, Icon: iconFor(c.icon) }))
     const byId = Object.fromEntries(categories.map((c) => [c.id, c]))
-    const planById = Object.fromEntries(state.plans.map((p) => [p.id, p]))
+    const fallback = categories.find((c) => c.name === 'Otros' && !c.custom) ?? categories[0]
+    const planById = Object.fromEntries(data.plans.map((p) => [p.id, p]))
+    const installmentsOf = (planId) => data.expenses
+      .filter((e) => e.installmentPlanId === planId)
+      .sort((a, b) => a.installmentNumber - b.installmentNumber)
+
     return {
-      expenses: state.expenses,
-      history: state.history,
-      plans: state.plans,
+      status,
+      loadError,
+      reload: load,
+      expenses: data.expenses,
+      plans: data.plans,
       categories,
-      cards: [...new Set(state.plans.map((p) => p.card).filter(Boolean))],
-      getCategory: (id) => byId[id] ?? byId.otros,
+      cards: [...new Set(data.plans.map((p) => p.card).filter(Boolean))],
+      getCategory: (id) => byId[id] ?? fallback ?? { id: null, name: 'Sin categoría', color: '#8C9BBB', Icon: iconFor('tag') },
       getPlan: (id) => planById[id] ?? null,
-      /** An installment's history includes its purchase's history. */
-      historyOf: (expenseId) => {
-        const expense = state.expenses.find((e) => e.id === expenseId)
-        return state.history
-          .filter((h) => h.expenseId === expenseId || (expense?.installmentPlanId && h.planId === expense.installmentPlanId))
-          .sort((a, b) => a.changedAt.localeCompare(b.changedAt))
-      },
-      planHistoryOf: (planId) => state.history.filter((h) => h.planId === planId),
-      installmentsOf: (planId) => state.expenses
-        .filter((e) => e.installmentPlanId === planId)
-        .sort((a, b) => a.installmentNumber - b.installmentNumber),
+      installmentsOf,
       addExpense,
       editExpense,
       voidExpense,
@@ -242,11 +174,31 @@ export function PersonalStoreProvider({ children }) {
       editInstallmentPlan,
       voidInstallmentPlan,
       addCategory,
-      saveError,
+      uploadReceipt,
+      /** History entries of an expense; installments show their purchase's history plus their own voiding. */
+      fetchExpenseHistory: async (expense) => {
+        const { data: rows, error } = await supabase
+          .from('expense_history').select('*').eq('expense_id', expense.id).order('changed_at')
+        if (error) throw error
+        const own = normalizeExpenseHistory(rows)
+        if (!expense.installmentPlanId) return own
+        const plan = await fetchPlanHistory(expense.installmentPlanId, installmentsOf(expense.installmentPlanId))
+        return [...plan, ...own.filter((h) => h.action === 'voided')]
+          .sort((a, b) => a.changedAt.localeCompare(b.changedAt))
+      },
+      fetchPlanHistory: (planId) => fetchPlanHistory(planId, installmentsOf(planId)),
     }
-  }, [state, addExpense, editExpense, voidExpense, addInstallmentPlan, editInstallmentPlan, voidInstallmentPlan, addCategory, saveError])
+  }, [data, status, loadError, load, addExpense, editExpense, voidExpense, addInstallmentPlan, editInstallmentPlan, voidInstallmentPlan, addCategory, uploadReceipt])
 
   return <PersonalContext.Provider value={value}>{children}</PersonalContext.Provider>
+}
+
+async function fetchPlanHistory(planId, installments) {
+  const { data: rows, error } = await supabase
+    .from('installment_plan_history').select('*').eq('plan_id', planId).order('changed_at')
+  if (error) throw error
+  const voided = installments.filter((e) => e.status === 'voided' && e.voidReason?.startsWith('Compra anulada')).length
+  return normalizePlanHistory(rows, voided)
 }
 
 export function usePersonalStore() {

@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import Pressable from './Pressable'
 import { usePersonalStore } from '../store/PersonalStore'
 import { softSpring, spring } from '../lib/motion'
+import { friendlyError } from '../lib/db'
 
 const CUSTOM_COLORS = ['#38BDF8', '#F472B6', '#34D399', '#FBBF24', '#A3E635', '#FB923C', '#C084FC', '#94A3B8']
 
@@ -51,13 +52,17 @@ export default function CategoryPicker({ value, onChange }) {
         {creating && (
           <CategoryCreator
             onCancel={() => setCreating(false)}
-            onCreate={({ name, color }) => {
+            onCreate={async ({ name, color }) => {
               const exists = store.categories.some((c) => c.name.toLowerCase() === name.trim().toLowerCase())
               if (exists) return 'Ya tenés una categoría con ese nombre.'
-              const created = store.addCategory({ name, color })
-              onChange(created.id)
-              setCreating(false)
-              return null
+              try {
+                const created = await store.addCategory({ name, color })
+                onChange(created.id)
+                setCreating(false)
+                return null
+              } catch (e) {
+                return friendlyError(e)
+              }
             }}
           />
         )}
@@ -70,13 +75,16 @@ function CategoryCreator({ onCreate, onCancel }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState(CUSTOM_COLORS[0])
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  function create() {
+  async function create() {
     if (!name.trim()) {
       setError('Ponele un nombre.')
       return
     }
-    const problem = onCreate({ name, color })
+    setBusy(true)
+    const problem = await onCreate({ name, color })
+    setBusy(false)
     if (problem) setError(problem)
   }
 
@@ -117,7 +125,7 @@ function CategoryCreator({ onCreate, onCancel }) {
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="cat-creator-actions">
           <Pressable className="btn btn-glass" onClick={onCancel}>Cancelar</Pressable>
-          <Pressable className="btn btn-primary" onClick={create}>Crear categoría</Pressable>
+          <Pressable className="btn btn-primary" onClick={create} disabled={busy}>{busy ? 'Creando…' : 'Crear categoría'}</Pressable>
         </div>
       </div>
     </motion.div>

@@ -9,6 +9,8 @@ import Amount from './Amount'
 import HistoryList from './HistoryList'
 import { usePersonalStore } from '../store/PersonalStore'
 import useReceiptUrl from '../hooks/useReceiptUrl'
+import useHistory from '../hooks/useHistory'
+import { friendlyError } from '../lib/db'
 import { formatLongDate, formatWhen } from '../lib/dates'
 import { formatMoney } from '../lib/format'
 import { toArs } from '../lib/expenses'
@@ -29,14 +31,27 @@ function Detail({ expenseId, onClose, onEdit, onOpenPlan, onDone }) {
   const receiptUrl = useReceiptUrl(plan ? plan.receiptId : expense?.receiptId)
   const [voiding, setVoiding] = useState(false)
   const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const history = useHistory(
+    () => (expense ? store.fetchExpenseHistory(expense) : Promise.resolve([])),
+    `${expenseId}-${expense?.status}-${expense?.updatedAt}-${plan?.status}-${plan?.categoryId}-${plan?.note}-${plan?.card}`,
+  )
 
   if (!expense) return null
   const category = store.getCategory(expense.categoryId)
   const voided = expense.status === 'voided'
 
-  function confirmVoid() {
-    store.voidExpense(expense.id, reason)
-    onDone('Gasto anulado')
+  async function confirmVoid() {
+    setBusy(true)
+    setError('')
+    try {
+      await store.voidExpense(expense.id, reason)
+      onDone('Gasto anulado')
+    } catch (e) {
+      setError(friendlyError(e))
+      setBusy(false)
+    }
   }
 
   return (
@@ -95,7 +110,7 @@ function Detail({ expenseId, onClose, onEdit, onOpenPlan, onDone }) {
         </figure>
       )}
 
-      <HistoryList entries={store.historyOf(expense.id)} getCategory={store.getCategory} />
+      <HistoryList entries={history.entries} status={history.status} getCategory={store.getCategory} />
 
       {plan && !voided && (
         <p className="muted-sm detail-note">Para editar o anular, abrí la compra completa: los cambios se aplican a todas sus cuotas.</p>
@@ -111,6 +126,8 @@ function Detail({ expenseId, onClose, onEdit, onOpenPlan, onDone }) {
               confirmLabel="Anular gasto"
               reason={reason}
               setReason={setReason}
+              busy={busy}
+              error={error}
               onCancel={() => setVoiding(false)}
               onConfirm={confirmVoid}
             />
@@ -131,7 +148,7 @@ function Detail({ expenseId, onClose, onEdit, onOpenPlan, onDone }) {
 }
 
 /** Mandatory-reason confirmation used to void expenses and purchases. */
-export function VoidForm({ title, explanation, confirmLabel, reason, setReason, onCancel, onConfirm }) {
+export function VoidForm({ title, explanation, confirmLabel, reason, setReason, busy = false, error = '', onCancel, onConfirm }) {
   return (
     <motion.div
       className="void-form glass"
@@ -152,10 +169,11 @@ export function VoidForm({ title, explanation, confirmLabel, reason, setReason, 
         autoFocus
         onChange={(e) => setReason(e.target.value)}
       />
+      {error && <p className="form-error" role="alert">{error}</p>}
       <div className="detail-actions">
-        <Pressable className="btn btn-glass" onClick={onCancel}>Cancelar</Pressable>
-        <Pressable className="btn btn-danger" disabled={reason.trim().length < 3} onClick={onConfirm}>
-          {confirmLabel}
+        <Pressable className="btn btn-glass" onClick={onCancel} disabled={busy}>Cancelar</Pressable>
+        <Pressable className="btn btn-danger" disabled={busy || reason.trim().length < 3} onClick={onConfirm}>
+          {busy ? 'Anulando…' : confirmLabel}
         </Pressable>
       </div>
     </motion.div>

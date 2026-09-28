@@ -1,5 +1,5 @@
-// Receipt photos: compressed in the browser and stored in IndexedDB
-// (localStorage is too small for images). Receipts are never replaced or deleted.
+// Image compression in the browser, plus the IndexedDB store used before accounts existed
+// (stage 2): only read now, to import receipts saved on this device.
 
 const DB_NAME = 'gastos'
 const STORE = 'receipts'
@@ -33,14 +33,22 @@ export function getReceipt(id) {
   return withStore('readonly', (store) => store.get(id))
 }
 
-/** Scales the photo down to MAX_SIDE and re-encodes it as JPEG. */
-export async function compressImage(file) {
+/**
+ * Scales the photo down to `maxSide` and re-encodes it as JPEG.
+ * `square: true` crops the centered square first (profile photos).
+ */
+export async function compressImage(file, { maxSide = MAX_SIDE, square = false } = {}) {
   const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+  const side = Math.min(bitmap.width, bitmap.height)
+  const sx = square ? (bitmap.width - side) / 2 : 0
+  const sy = square ? (bitmap.height - side) / 2 : 0
+  const sw = square ? side : bitmap.width
+  const sh = square ? side : bitmap.height
+  const scale = Math.min(1, maxSide / Math.max(sw, sh))
   const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  canvas.width = Math.round(sw * scale)
+  canvas.height = Math.round(sh * scale)
+  canvas.getContext('2d').drawImage(bitmap, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
   bitmap.close?.()
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('No se pudo comprimir la imagen'))), 'image/jpeg', QUALITY)

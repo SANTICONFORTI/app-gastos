@@ -12,6 +12,8 @@ import ProgressBar from './ProgressBar'
 import { VoidForm } from './ExpenseDetailSheet'
 import { usePersonalStore } from '../store/PersonalStore'
 import useReceiptUrl from '../hooks/useReceiptUrl'
+import useHistory from '../hooks/useHistory'
+import { friendlyError } from '../lib/db'
 import { formatLongDate, monthKey, monthLabelWithYear } from '../lib/dates'
 import { formatMoney } from '../lib/format'
 import { toArs } from '../lib/expenses'
@@ -33,6 +35,12 @@ function PlanDetail({ planId, onClose, onOpenExpense, onDone }) {
   const receiptUrl = useReceiptUrl(plan?.receiptId)
   const [mode, setMode] = useState('view') // 'view' | 'edit' | 'void'
   const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const history = useHistory(
+    () => store.fetchPlanHistory(planId),
+    `${planId}-${plan?.status}-${plan?.categoryId}-${plan?.note}-${plan?.card}`,
+  )
 
   if (!plan) return null
   const category = store.getCategory(plan.categoryId)
@@ -43,9 +51,16 @@ function PlanDetail({ planId, onClose, onOpenExpense, onDone }) {
   const futureActive = installments.filter((e) => e.status === 'active' && monthKey(e.spentAt) > current).length
   const voided = plan.status === 'voided'
 
-  function confirmVoid() {
-    store.voidInstallmentPlan(plan.id, reason)
-    onDone('Compra anulada')
+  async function confirmVoid() {
+    setBusy(true)
+    setError('')
+    try {
+      await store.voidInstallmentPlan(plan.id, reason)
+      onDone('Compra anulada')
+    } catch (e) {
+      setError(friendlyError(e))
+      setBusy(false)
+    }
   }
 
   return (
@@ -122,7 +137,7 @@ function PlanDetail({ planId, onClose, onOpenExpense, onDone }) {
         </figure>
       )}
 
-      <HistoryList entries={store.planHistoryOf(plan.id)} getCategory={store.getCategory} />
+      <HistoryList entries={history.entries} status={history.status} getCategory={store.getCategory} />
 
       {!voided && (
         <AnimatePresence mode="wait" initial={false}>
@@ -136,6 +151,8 @@ function PlanDetail({ planId, onClose, onOpenExpense, onDone }) {
               confirmLabel="Anular compra"
               reason={reason}
               setReason={setReason}
+              busy={busy}
+              error={error}
               onCancel={() => setMode('view')}
               onConfirm={confirmVoid}
             />
@@ -164,10 +181,19 @@ function PlanEditForm({ plan, onCancel, onDone }) {
   const [categoryId, setCategoryId] = useState(plan.categoryId)
   const [note, setNote] = useState(plan.note ?? '')
   const [card, setCard] = useState(plan.card ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
 
-  function save() {
-    const changed = store.editInstallmentPlan(plan.id, { categoryId, note: note.trim(), card: card.trim() })
-    onDone(changed ? 'Cambios guardados en todas las cuotas' : 'No hubo cambios')
+  async function save() {
+    setBusy(true)
+    setError('')
+    try {
+      const changed = await store.editInstallmentPlan(plan.id, { categoryId, note: note.trim(), card: card.trim() })
+      onDone(changed ? 'Cambios guardados en todas las cuotas' : 'No hubo cambios')
+    } catch (e) {
+      setError(friendlyError(e))
+      setBusy(false)
+    }
   }
 
   return (
@@ -198,9 +224,10 @@ function PlanEditForm({ plan, onCancel, onDone }) {
         {store.cards.map((c) => <option key={c} value={c} />)}
       </datalist>
       <CategoryPicker value={categoryId} onChange={setCategoryId} />
+      {error && <p className="form-error" role="alert">{error}</p>}
       <div className="detail-actions">
-        <Pressable className="btn btn-glass" onClick={onCancel}>Cancelar</Pressable>
-        <Pressable className="btn btn-primary" onClick={save}>Guardar cambios</Pressable>
+        <Pressable className="btn btn-glass" onClick={onCancel} disabled={busy}>Cancelar</Pressable>
+        <Pressable className="btn btn-primary" onClick={save} disabled={busy}>{busy ? 'Guardando…' : 'Guardar cambios'}</Pressable>
       </div>
     </motion.div>
   )

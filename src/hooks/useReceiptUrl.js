@@ -1,30 +1,21 @@
 import { useEffect, useState } from 'react'
-import { getReceipt } from '../lib/receipts'
+import { supabase } from '../lib/supabase'
 
-/** Temporary URL to show a stored receipt photo in an <img>. */
-export default function useReceiptUrl(receiptId) {
+const LINK_SECONDS = 60 * 60
+
+/** Temporary private link to show a stored receipt photo (the receipts bucket is private). */
+export default function useReceiptUrl(path) {
   const [url, setUrl] = useState(null)
 
   useEffect(() => {
-    if (!receiptId) {
-      setUrl(null)
-      return
-    }
-    let objectUrl = null
+    setUrl(null)
+    if (!path) return
     let cancelled = false
-    getReceipt(receiptId)
-      .then((blob) => {
-        if (blob && !cancelled) {
-          objectUrl = URL.createObjectURL(blob)
-          setUrl(objectUrl)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [receiptId])
+    supabase.storage.from('receipts').createSignedUrl(path, LINK_SECONDS).then(({ data }) => {
+      if (!cancelled && data?.signedUrl) setUrl(data.signedUrl)
+    })
+    return () => { cancelled = true }
+  }, [path])
 
   return url
 }
