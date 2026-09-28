@@ -1195,6 +1195,311 @@ button.movement-btn:hover .movement:not(.movement-voided) { background: rgba(255
   border-color: var(--accent);
 }
 
+/* ---------- Stage 3: installments ---------- */
+
+.screen-title { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.screen-loading { min-height: 60vh; }
+
+.installments-box {
+  border-radius: 26px;
+  overflow: hidden;
+}
+
+.switch-row {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px 0 18px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  text-align: left;
+}
+
+.switch-label { flex-grow: 1; font-size: 15px; font-weight: 600; color: var(--text); }
+
+.switch {
+  width: 50px;
+  height: 30px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  justify-content: flex-start;
+  transition: background 0.25s;
+}
+
+.switch.is-on { background: var(--accent); justify-content: flex-end; }
+
+.switch-knob {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.installments-fields { overflow: hidden; }
+
+.installments-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 2px 14px 16px;
+}
+
+.installments-inner > .currency-toggle { align-self: center; }
+
+.count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-left: 4px;
+}
+
+.field-label { font-size: 14px; font-weight: 600; color: var(--text-2); }
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepper-value {
+  min-width: 36px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper-value.month-value { min-width: 120px; font-size: 15px; }
+
+.quick-counts {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.quick-counts .filter-chip { flex: 1 1 0; justify-content: center; padding: 0; }
+
+.installment-badge {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+}
+
+.plan-link { width: 100%; }
+.detail-note { text-align: center; }
+
+.finish-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 20px;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  color: #B7F5CD;
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.finish-banner svg { flex-shrink: 0; color: var(--online); }
+.finish-banner-btn { width: 100%; min-height: 48px; }
+
+.plan-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 22px;
+}
+
+.plan-progress-text { font-size: 14px; font-weight: 600; }
+
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--grad-b), var(--grad-a));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.list-title { margin-bottom: 8px; }
+
+.installment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.installment-row {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+}
+
+.installment-row.is-current {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.installment-row.is-voided { opacity: 0.55; }
+.installment-row.is-voided .installment-amount,
+.installment-row.is-voided .installment-month { text-decoration: line-through; }
+
+.installment-number {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.installment-month { flex-grow: 1; font-weight: 600; }
+.installment-status { font-size: 12px; font-weight: 700; color: var(--text-2); }
+.installment-status.status-este-mes { color: var(--accent); }
+.installment-status.status-pagada { color: var(--online); }
+.installment-status.status-anulada { color: #FF9AAA; }
+.installment-amount { min-width: 86px; text-align: right; font-weight: 700; }
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  height: 62px;
+  padding: 0 16px;
+  border-radius: 20px;
+}
+
+.stat-tile .chip-title { font-size: 16px; }
+
+.committed-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.committed-chart { position: relative; height: 170px; }
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.month-nav-text {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.committed-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.committed-item {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+  font-size: 14px;
+}
+
+.committed-item-name {
+  flex-grow: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.committed-item-amount { font-weight: 700; }
+.committed-empty { text-align: center; padding: 6px 0; }
+
+.plan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan-list.is-dimmed { opacity: 0.7; }
+
+.plan-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 22px;
+  text-align: left;
+}
+
+.plan-card.is-voided .movement-title,
+.plan-card.is-voided .movement-amount { text-decoration: line-through; }
+
+.plan-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 /* Invisible hit area so compact buttons still get a 44px touch target. */
 .switcher-option,
 .currency-option,

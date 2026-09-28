@@ -1,36 +1,44 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { User, Users, Camera, Check, Plus, CalendarDays } from 'lucide-react'
+import { User, Users, Camera, Check, CalendarDays, CreditCard, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react'
 import Sheet from './Sheet'
 import SheetHeader from './SheetHeader'
 import Pressable from './Pressable'
+import PillToggle from './PillToggle'
+import CategoryPicker from './CategoryPicker'
 import { usePersonalStore } from '../store/PersonalStore'
 import useDollarRates from '../hooks/useDollarRates'
 import useReceiptUrl from '../hooks/useReceiptUrl'
 import { amountToInput, formatAmountInput, parseAmountInput } from '../lib/amountInput'
-import { dateInputToIso, toDateInput } from '../lib/dates'
+import { dateInputToIso, monthKey, monthLabelWithYear, shiftMonth, toDateInput } from '../lib/dates'
 import { formatMoney } from '../lib/format'
+import { splitInstallments } from '../lib/installments'
 import { compressImage, saveReceipt } from '../lib/receipts'
 import { newId } from '../lib/id'
-import { softSpring, spring } from '../lib/motion'
+import { softSpring } from '../lib/motion'
 
-const CUSTOM_COLORS = ['#38BDF8', '#F472B6', '#34D399', '#FBBF24', '#A3E635', '#FB923C', '#C084FC', '#94A3B8']
+const QUICK_COUNTS = [3, 6, 12, 18, 24]
+const MIN_COUNT = 2
+const MAX_COUNT = 60
+const round2 = (n) => Math.round(n * 100) / 100
+const fmtNumber = (n) => new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(n)
 
 /**
- * Create or edit an expense. `expense` given = edit mode (personal only).
+ * Create or edit an expense. `expense` given = edit mode (personal, non-installment only).
  * The chosen destination recolors the whole sheet.
  */
-export default function ExpenseSheet({ open, expense, initialSpace, groupName, groupSize, onClose, onDone, onNotice }) {
+export default function ExpenseSheet({ open, expense, startInInstallments, initialSpace, groupName, groupSize, onClose, onDone, onNotice }) {
   const [dest, setDest] = useState(initialSpace)
 
   useEffect(() => {
-    if (open) setDest(expense ? 'personal' : initialSpace)
-  }, [open, expense, initialSpace])
+    if (open) setDest(expense || startInInstallments ? 'personal' : initialSpace)
+  }, [open, expense, startInInstallments, initialSpace])
 
   return (
     <Sheet open={open} onClose={onClose} labelledBy="expense-sheet-title" space={dest} tall>
       <ExpenseForm
         expense={expense}
+        startInInstallments={startInInstallments}
         dest={dest}
         setDest={setDest}
         groupName={groupName}
@@ -43,7 +51,7 @@ export default function ExpenseSheet({ open, expense, initialSpace, groupName, g
   )
 }
 
-function ExpenseForm({ expense, dest, setDest, groupName, groupSize, onClose, onDone, onNotice }) {
+function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, groupSize, onClose, onDone, onNotice }) {
   const store = usePersonalStore()
   const rates = useDollarRates()
   const editing = Boolean(expense)
@@ -59,12 +67,20 @@ function ExpenseForm({ expense, dest, setDest, groupName, groupSize, onClose, on
   const [receiptPreview, setReceiptPreview] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [creatingCategory, setCreatingCategory] = useState(false)
   const fileRef = useRef(null)
   const existingReceiptUrl = useReceiptUrl(expense?.receiptId)
 
+  // Installments
+  const [inInstallments, setInInstallments] = useState(Boolean(startInInstallments))
+  const [amountMode, setAmountMode] = useState('total')
+  const [count, setCount] = useState(3)
+  const [firstMonth, setFirstMonth] = useState(monthKey())
+  const [card, setCard] = useState('')
+
   const isGroup = dest === 'group'
   const amount = parseAmountInput(amountText)
+  const totalAmount = !inInstallments ? amount : amountMode === 'total' ? amount : round2(amount * count)
+  const perInstallment = inInstallments && totalAmount > 0 ? splitInstallments(totalAmount, count)[0] : null
 
   // Keep the quote saved with the expense unless the currency or quote type changes.
   const keepsSavedRate = editing && expense.currency === 'USD' && currency === 'USD' && expense.rateType === rateType
@@ -78,6 +94,21 @@ function ExpenseForm({ expense, dest, setDest, groupName, groupSize, onClose, on
   const needsManualRate = currency === 'USD' && !keepsSavedRate && liveRate == null
 
   useEffect(() => () => receiptPreview && URL.revokeObjectURL(receiptPreview), [receiptPreview])
+
+  function toggleInstallments() {
+    setInInstallments((on) => {
+      // USD bought in installments is almost always paid with a card.
+      if (!on && currency === 'USD') setRateType('tarjeta')
+      return !on
+    })
+  }
+
+  function changeDate(value) {
+    if (!value) return
+    setDate(value)
+    // First installment follows the purchase month unless the user picked another one.
+    if (firstMonth === monthKey(dateInputToIso(date))) setFirstMonth(monthKey(dateInputToIso(value)))
+  }
 
   async function handlePhoto(e) {
     const file = e.target.files?.[0]
@@ -103,6 +134,10 @@ function ExpenseForm({ expense, dest, setDest, groupName, groupSize, onClose, on
       setError('Ingresá un monto mayor a cero.')
       return
     }
+    if (inInstallments && !(Number.isInteger(count) && count >= MIN_COUNT && count <= MAX_COUNT)) {
+      setError(`Elegí entre ${MIN_COUNT} y ${MAX_COUNT} cuotas.`)
+      return
+    }
     if (currency === 'USD' && !rate) {
       setError('Necesitamos la cotización del dólar para convertir el gasto.')
       return
@@ -121,19 +156,35 @@ function ExpenseForm({ expense, dest, setDest, groupName, groupSize, onClose, on
       }
     }
 
-    const data = {
-      amount,
+    const common = {
       currency,
       exchangeRate: rate,
       rateType: currency === 'USD' ? rateType : null,
       categoryId,
       note: note.trim(),
       receiptId,
+    }
+
+    if (inInstallments) {
+      store.addInstallmentPlan({
+        ...common,
+        totalAmount,
+        installmentCount: count,
+        firstMonth,
+        card: card.trim(),
+        purchasedAt: dateInputToIso(date),
+      })
+      onDone(`Compra en ${count} cuotas guardada`)
+      return
+    }
+
+    const data = {
+      ...common,
+      amount,
       spentAt: editing && toDateInput(expense.spentAt) === date
         ? expense.spentAt
         : dateInputToIso(date, editing ? expense.spentAt : new Date()),
     }
-
     if (editing) {
       const changed = store.editExpense(expense.id, data)
       onDone(changed ? 'Cambios guardados' : 'No hubo cambios')
@@ -143,24 +194,33 @@ function ExpenseForm({ expense, dest, setDest, groupName, groupSize, onClose, on
     }
   }
 
+  const symbol = currency === 'USD' ? 'US$' : '$'
   let conversion
-  if (currency === 'USD') {
+  if (inInstallments) {
+    const base = totalAmount > 0
+      ? `${count} cuotas de ${symbol} ${fmtNumber(perInstallment)} · total ${symbol} ${fmtNumber(totalAmount)}`
+      : `Se reparte en ${count} cuotas, una por mes`
+    conversion = currency === 'USD' && rate && totalAmount > 0
+      ? `${base} (≈ ${formatMoney(perInstallment * rate)} por cuota)`
+      : base
+  } else if (currency === 'USD') {
     conversion = rate
       ? `≈ ${formatMoney(amount > 0 ? amount * rate : 0)} · ${rateType} a ${formatMoney(rate)}${keepsSavedRate ? ' (guardada)' : ''}`
       : rates.status === 'loading' ? 'Buscando cotización…' : 'Sin conexión: cargá la cotización a mano'
   } else {
     const blue = rates.quote('blue')
     conversion = blue && amount > 0
-      ? `≈ US$ ${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(amount / blue)} al dólar blue`
+      ? `≈ US$ ${fmtNumber(amount / blue)} al dólar blue`
       : 'Podés cargar en pesos o dólares'
   }
 
   const receiptThumb = receiptPreview ?? existingReceiptUrl
-  const title = editing ? 'Editar gasto' : 'Nuevo gasto'
+  const amountLabel = !inInstallments ? 'Monto' : amountMode === 'total' ? 'Monto total' : 'Valor de cada cuota'
+  const showInstallmentOption = !editing && !isGroup
 
   return (
     <form className="expense-form" onSubmit={handleSubmit} noValidate>
-      <SheetHeader id="expense-sheet-title" title={title} onClose={onClose} />
+      <SheetHeader id="expense-sheet-title" title={editing ? 'Editar gasto' : 'Nuevo gasto'} onClose={onClose} />
 
       {!editing && (
         <fieldset className="dest-grid">
@@ -178,9 +238,9 @@ function ExpenseForm({ expense, dest, setDest, groupName, groupSize, onClose, on
           onChange={setCurrency}
           layoutId="currency-pill"
         />
-        <label htmlFor="amount" className="amount-label">Monto</label>
+        <label htmlFor="amount" className="amount-label">{amountLabel}</label>
         <div className="amount-input-row">
-          <span className="amount-symbol">{currency === 'USD' ? 'US$' : '$'}</span>
+          <span className="amount-symbol">{symbol}</span>
           <input
             id="amount"
             inputMode="decimal"
@@ -230,74 +290,129 @@ function ExpenseForm({ expense, dest, setDest, groupName, groupSize, onClose, on
         <span className="conversion-pill glass" aria-live="polite">{conversion}</span>
       </div>
 
+      {showInstallmentOption && (
+        <div className="installments-box glass">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={inInstallments}
+            className="switch-row"
+            onClick={toggleInstallments}
+          >
+            <CreditCard size={18} strokeWidth={2} aria-hidden="true" />
+            <span className="switch-label">En cuotas</span>
+            <span className={`switch ${inInstallments ? 'is-on' : ''}`} aria-hidden="true">
+              <motion.span className="switch-knob" layout transition={{ type: 'spring', stiffness: 500, damping: 32 }} />
+            </span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {inInstallments && (
+              <motion.div
+                className="installments-fields"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={softSpring}
+              >
+                <div className="installments-inner">
+                  <PillToggle
+                    label="El monto que cargaste es"
+                    small
+                    options={[{ id: 'total', label: 'Total' }, { id: 'installment', label: 'Por cuota' }]}
+                    value={amountMode}
+                    onChange={setAmountMode}
+                    layoutId="amount-mode-pill"
+                  />
+
+                  <div className="count-row">
+                    <span className="field-label" id="count-label">Cuotas</span>
+                    <div className="stepper" role="group" aria-labelledby="count-label">
+                      <Pressable
+                        className="btn btn-glass btn-icon"
+                        aria-label="Una cuota menos"
+                        disabled={count <= MIN_COUNT}
+                        onClick={() => setCount((c) => Math.max(MIN_COUNT, c - 1))}
+                      >
+                        <Minus size={16} strokeWidth={2.4} />
+                      </Pressable>
+                      <span className="stepper-value" aria-live="polite">{count}</span>
+                      <Pressable
+                        className="btn btn-glass btn-icon"
+                        aria-label="Una cuota más"
+                        disabled={count >= MAX_COUNT}
+                        onClick={() => setCount((c) => Math.min(MAX_COUNT, c + 1))}
+                      >
+                        <Plus size={16} strokeWidth={2.4} />
+                      </Pressable>
+                    </div>
+                  </div>
+                  <div className="quick-counts">
+                    {QUICK_COUNTS.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        className={`filter-chip ${count === n ? 'is-active' : ''}`}
+                        aria-pressed={count === n}
+                        onClick={() => setCount(n)}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="count-row">
+                    <span className="field-label" id="first-month-label">Primera cuota</span>
+                    <div className="stepper" role="group" aria-labelledby="first-month-label">
+                      <Pressable className="btn btn-glass btn-icon" aria-label="Mes anterior" onClick={() => setFirstMonth((m) => shiftMonth(m, -1))}>
+                        <ChevronLeft size={18} strokeWidth={2.4} />
+                      </Pressable>
+                      <span className="stepper-value month-value" aria-live="polite">{monthLabelWithYear(firstMonth)}</span>
+                      <Pressable className="btn btn-glass btn-icon" aria-label="Mes siguiente" onClick={() => setFirstMonth((m) => shiftMonth(m, 1))}>
+                        <ChevronRight size={18} strokeWidth={2.4} />
+                      </Pressable>
+                    </div>
+                  </div>
+
+                  <label className="sr-only" htmlFor="card">Tarjeta (opcional)</label>
+                  <input
+                    id="card"
+                    className="note-input glass"
+                    placeholder="Tarjeta (opcional, ej: Visa Galicia)"
+                    maxLength={30}
+                    list="known-cards"
+                    value={card}
+                    onChange={(e) => setCard(e.target.value)}
+                  />
+                  <datalist id="known-cards">
+                    {store.cards.map((c) => <option key={c} value={c} />)}
+                  </datalist>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
       <label className="date-row glass">
         <CalendarDays size={18} strokeWidth={2} aria-hidden="true" />
-        <span>Fecha</span>
+        <span>{inInstallments ? 'Fecha de compra' : 'Fecha'}</span>
         <input
           type="date"
           value={date}
           max={toDateInput(new Date(new Date().getFullYear() + 1, 11, 31))}
-          onChange={(e) => e.target.value && setDate(e.target.value)}
+          onChange={(e) => changeDate(e.target.value)}
         />
       </label>
 
-      <fieldset className="cat-section">
-        <legend className="section-label">Categoría</legend>
-        <div className="cat-grid">
-          {store.categories.map(({ id, name, color, Icon }) => {
-            const active = categoryId === id
-            return (
-              <motion.button
-                key={id}
-                type="button"
-                className={`cat-option ${active ? 'is-active' : ''}`}
-                aria-pressed={active}
-                onClick={() => setCategoryId(id)}
-                whileTap={{ scale: 0.9 }}
-                transition={spring}
-              >
-                <span className="cat-option-circle">
-                  <Icon size={22} strokeWidth={2} color={color} />
-                </span>
-                <span className="cat-option-name">{name}</span>
-              </motion.button>
-            )
-          })}
-          <motion.button
-            type="button"
-            className="cat-option"
-            onClick={() => setCreatingCategory((v) => !v)}
-            aria-expanded={creatingCategory}
-            whileTap={{ scale: 0.9 }}
-            transition={spring}
-          >
-            <span className="cat-option-circle cat-option-new"><Plus size={22} strokeWidth={2} /></span>
-            <span className="cat-option-name">Nueva</span>
-          </motion.button>
-        </div>
-        <AnimatePresence initial={false}>
-          {creatingCategory && (
-            <CategoryCreator
-              onCancel={() => setCreatingCategory(false)}
-              onCreate={({ name, color }) => {
-                const exists = store.categories.some((c) => c.name.toLowerCase() === name.trim().toLowerCase())
-                if (exists) return 'Ya tenés una categoría con ese nombre.'
-                const created = store.addCategory({ name, color })
-                setCategoryId(created.id)
-                setCreatingCategory(false)
-                return null
-              }}
-            />
-          )}
-        </AnimatePresence>
-      </fieldset>
+      <CategoryPicker value={categoryId} onChange={setCategoryId} />
 
       <div className="note-row">
-        <label htmlFor="note" className="sr-only">Nota</label>
+        <label htmlFor="note" className="sr-only">{inInstallments ? 'Qué compraste' : 'Nota'}</label>
         <input
           id="note"
           className="note-input glass"
-          placeholder="Agregar una nota (ej: Coto, Netflix)"
+          placeholder={inInstallments ? '¿Qué compraste? (ej: Heladera)' : 'Agregar una nota (ej: Coto, Netflix)'}
           maxLength={80}
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -343,95 +458,21 @@ function ExpenseForm({ expense, dest, setDest, groupName, groupSize, onClose, on
         <span className="sheet-save-check"><Check size={14} strokeWidth={3.2} /></span>
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
-            key={`${dest}-${editing}`}
+            key={`${dest}-${editing}-${inInstallments}`}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={softSpring}
           >
-            {editing ? 'Guardar cambios' : isGroup ? `Guardar en ${groupName}` : 'Guardar en Personal'}
+            {editing
+              ? 'Guardar cambios'
+              : isGroup
+                ? `Guardar en ${groupName}`
+                : inInstallments ? `Guardar en ${count} cuotas` : 'Guardar en Personal'}
           </motion.span>
         </AnimatePresence>
       </Pressable>
     </form>
-  )
-}
-
-function PillToggle({ label, options, value, onChange, layoutId, small = false }) {
-  return (
-    <div className={`currency-toggle glass ${small ? 'is-small' : ''}`} role="radiogroup" aria-label={label}>
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          role="radio"
-          aria-checked={value === o.id}
-          className={`currency-option ${value === o.id ? 'is-active' : ''}`}
-          onClick={() => onChange(o.id)}
-        >
-          {value === o.id && <motion.span layoutId={layoutId} className="currency-pill" transition={spring} />}
-          <span className="switcher-label">{o.label}</span>
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function CategoryCreator({ onCreate, onCancel }) {
-  const [name, setName] = useState('')
-  const [color, setColor] = useState(CUSTOM_COLORS[0])
-  const [error, setError] = useState('')
-
-  function create() {
-    if (!name.trim()) {
-      setError('Ponele un nombre.')
-      return
-    }
-    const problem = onCreate({ name, color })
-    if (problem) setError(problem)
-  }
-
-  return (
-    <motion.div
-      className="cat-creator glass"
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={softSpring}
-    >
-      <div className="cat-creator-inner">
-        <label htmlFor="new-cat-name" className="sr-only">Nombre de la categoría</label>
-        <input
-          id="new-cat-name"
-          className="note-input glass"
-          placeholder="Nombre (ej: Mascotas)"
-          maxLength={20}
-          value={name}
-          autoFocus
-          onChange={(e) => { setName(e.target.value); setError('') }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create() } }}
-        />
-        <div className="swatches" role="radiogroup" aria-label="Color">
-          {CUSTOM_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              role="radio"
-              aria-checked={color === c}
-              aria-label={`Color ${c}`}
-              className={`swatch ${color === c ? 'is-active' : ''}`}
-              style={{ background: c }}
-              onClick={() => setColor(c)}
-            />
-          ))}
-        </div>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="cat-creator-actions">
-          <Pressable className="btn btn-glass" onClick={onCancel}>Cancelar</Pressable>
-          <Pressable className="btn btn-primary" onClick={create}>Crear categoría</Pressable>
-        </div>
-      </div>
-    </motion.div>
   )
 }
 

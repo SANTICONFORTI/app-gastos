@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 
 /**
@@ -6,6 +6,13 @@ import { AnimatePresence, motion } from 'framer-motion'
  * Children only mount while open, so their state resets every time it opens.
  */
 export default function Sheet({ open, onClose, labelledBy, space, tall = false, children }) {
+  // New key on every opening: reopening while the previous sheet is still sliding out
+  // must mount a fresh form instead of reviving the closing one (and its old state).
+  const openings = useRef(0)
+  const wasOpen = useRef(false)
+  if (open && !wasOpen.current) openings.current += 1
+  wasOpen.current = open
+
   useEffect(() => {
     if (!open) return
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -23,7 +30,7 @@ export default function Sheet({ open, onClose, labelledBy, space, tall = false, 
       {open && (
         <>
           <motion.div
-            key="backdrop"
+            key={`backdrop-${openings.current}`}
             className="sheet-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -31,7 +38,7 @@ export default function Sheet({ open, onClose, labelledBy, space, tall = false, 
             onClick={onClose}
           />
           <motion.div
-            key="sheet"
+            key={`sheet-${openings.current}`}
             className="sheet"
             data-space={space}
             role="dialog"

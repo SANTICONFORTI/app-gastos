@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Pencil, Ban, PlusCircle, History } from 'lucide-react'
+import { Pencil, Ban, CreditCard, ChevronRight } from 'lucide-react'
 import Sheet from './Sheet'
 import SheetHeader from './SheetHeader'
 import Pressable from './Pressable'
 import CategoryIcon from './CategoryIcon'
 import Amount from './Amount'
+import HistoryList from './HistoryList'
 import { usePersonalStore } from '../store/PersonalStore'
 import useReceiptUrl from '../hooks/useReceiptUrl'
 import { formatLongDate, formatWhen } from '../lib/dates'
@@ -13,25 +14,25 @@ import { formatMoney } from '../lib/format'
 import { toArs } from '../lib/expenses'
 import { softSpring } from '../lib/motion'
 
-export default function ExpenseDetailSheet({ expenseId, onClose, onEdit, onDone }) {
+export default function ExpenseDetailSheet({ expenseId, onClose, onEdit, onOpenPlan, onDone }) {
   return (
     <Sheet open={Boolean(expenseId)} onClose={onClose} labelledBy="detail-title" space="personal">
-      {expenseId && <Detail expenseId={expenseId} onClose={onClose} onEdit={onEdit} onDone={onDone} />}
+      {expenseId && <Detail expenseId={expenseId} onClose={onClose} onEdit={onEdit} onOpenPlan={onOpenPlan} onDone={onDone} />}
     </Sheet>
   )
 }
 
-function Detail({ expenseId, onClose, onEdit, onDone }) {
+function Detail({ expenseId, onClose, onEdit, onOpenPlan, onDone }) {
   const store = usePersonalStore()
   const expense = store.expenses.find((e) => e.id === expenseId)
-  const receiptUrl = useReceiptUrl(expense?.receiptId)
+  const plan = expense?.installmentPlanId ? store.getPlan(expense.installmentPlanId) : null
+  const receiptUrl = useReceiptUrl(plan ? plan.receiptId : expense?.receiptId)
   const [voiding, setVoiding] = useState(false)
   const [reason, setReason] = useState('')
 
   if (!expense) return null
   const category = store.getCategory(expense.categoryId)
   const voided = expense.status === 'voided'
-  const history = store.historyOf(expense.id)
 
   function confirmVoid() {
     store.voidExpense(expense.id, reason)
@@ -40,12 +41,15 @@ function Detail({ expenseId, onClose, onEdit, onDone }) {
 
   return (
     <div className="detail">
-      <SheetHeader id="detail-title" title="Detalle del gasto" onClose={onClose} />
+      <SheetHeader id="detail-title" title={plan ? 'Detalle de la cuota' : 'Detalle del gasto'} onClose={onClose} />
 
       <section className={`detail-hero ${voided ? 'is-voided' : ''}`}>
         <CategoryIcon color={category.color} Icon={category.Icon} size={56} />
         <span className="detail-name">{expense.note || category.name}</span>
         <Amount value={toArs(expense)} className="detail-amount" />
+        {plan && (
+          <span className="installment-badge">Cuota {expense.installmentNumber} de {plan.installmentCount}</span>
+        )}
         {expense.currency === 'USD' && (
           <span className="muted-sm">
             US$ {new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(expense.amount)} · dólar {expense.rateType} a {formatMoney(expense.exchangeRate)} (cotización guardada)
@@ -62,10 +66,23 @@ function Detail({ expenseId, onClose, onEdit, onDone }) {
         </div>
       )}
 
+      {plan && (
+        <Pressable className="chip glass plan-link" onClick={() => onOpenPlan(plan.id)}>
+          <CategoryIcon color="#5AC8FA" Icon={CreditCard} size={38} />
+          <span className="chip-text">
+            <span className="chip-title">Ver la compra completa</span>
+            <span className="chip-sub">
+              Total {formatMoney(plan.totalAmount * (plan.exchangeRate ?? 1))}{plan.card ? ` · ${plan.card}` : ''}
+            </span>
+          </span>
+          <ChevronRight size={16} strokeWidth={2.5} className="chip-arrow" aria-hidden="true" />
+        </Pressable>
+      )}
+
       <dl className="detail-list glass">
         <div><dt>Categoría</dt><dd>{category.name}</dd></div>
-        <div><dt>Fecha</dt><dd>{formatLongDate(expense.spentAt)}</dd></div>
-        {expense.note && <div><dt>Nota</dt><dd>{expense.note}</dd></div>}
+        <div><dt>{plan ? 'Mes de la cuota' : 'Fecha'}</dt><dd>{formatLongDate(expense.spentAt)}</dd></div>
+        {expense.note && <div><dt>{plan ? 'Compra' : 'Nota'}</dt><dd>{expense.note}</dd></div>}
         <div><dt>Moneda</dt><dd>{expense.currency === 'USD' ? 'Dólares' : 'Pesos'}</dd></div>
       </dl>
 
@@ -78,45 +95,25 @@ function Detail({ expenseId, onClose, onEdit, onDone }) {
         </figure>
       )}
 
-      <section aria-labelledby="history-title" className="history">
-        <h2 id="history-title" className="card-title history-title">
-          <History size={16} strokeWidth={2} aria-hidden="true" /> Historial
-        </h2>
-        <ol className="history-list">
-          {history.map((h) => <HistoryItem key={h.id} entry={h} getCategory={store.getCategory} />)}
-        </ol>
-      </section>
+      <HistoryList entries={store.historyOf(expense.id)} getCategory={store.getCategory} />
 
-      {!voided && (
+      {plan && !voided && (
+        <p className="muted-sm detail-note">Para editar o anular, abrí la compra completa: los cambios se aplican a todas sus cuotas.</p>
+      )}
+
+      {!plan && !voided && (
         <AnimatePresence mode="wait" initial={false}>
           {voiding ? (
-            <motion.div
+            <VoidForm
               key="void"
-              className="void-form glass"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={softSpring}
-            >
-              <label htmlFor="void-reason" className="card-title">¿Por qué lo anulás?</label>
-              <p className="muted-sm">El gasto no se borra: queda tachado en tu historial con este motivo.</p>
-              <textarea
-                id="void-reason"
-                className="void-textarea"
-                rows={2}
-                maxLength={120}
-                placeholder="Ej: lo cargué dos veces"
-                value={reason}
-                autoFocus
-                onChange={(e) => setReason(e.target.value)}
-              />
-              <div className="detail-actions">
-                <Pressable className="btn btn-glass" onClick={() => setVoiding(false)}>Cancelar</Pressable>
-                <Pressable className="btn btn-danger" disabled={reason.trim().length < 3} onClick={confirmVoid}>
-                  Anular gasto
-                </Pressable>
-              </div>
-            </motion.div>
+              title="¿Por qué lo anulás?"
+              explanation="El gasto no se borra: queda tachado en tu historial con este motivo."
+              confirmLabel="Anular gasto"
+              reason={reason}
+              setReason={setReason}
+              onCancel={() => setVoiding(false)}
+              onConfirm={confirmVoid}
+            />
           ) : (
             <motion.div key="actions" className="detail-actions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <Pressable className="btn btn-glass btn-lg" onClick={() => onEdit(expense)}>
@@ -133,61 +130,34 @@ function Detail({ expenseId, onClose, onEdit, onDone }) {
   )
 }
 
-const FIELD_LABELS = {
-  amount: 'Monto',
-  currency: 'Moneda',
-  exchangeRate: 'Cotización',
-  rateType: 'Tipo de dólar',
-  categoryId: 'Categoría',
-  note: 'Nota',
-  spentAt: 'Fecha',
-  receiptId: 'Ticket',
-}
-
-function describe(field, value, getCategory) {
-  if (value === null || value === '') return '—'
-  switch (field) {
-    case 'amount': return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(value)
-    case 'exchangeRate': return formatMoney(value)
-    case 'categoryId': return getCategory(value).name
-    case 'spentAt': return formatLongDate(value)
-    case 'receiptId': return 'adjunto'
-    case 'currency': return value === 'USD' ? 'USD' : 'ARS'
-    default: return String(value)
-  }
-}
-
-function HistoryItem({ entry, getCategory }) {
-  const when = formatWhen(entry.changedAt)
-  if (entry.action === 'created') {
-    return (
-      <li className="history-item">
-        <PlusCircle size={16} strokeWidth={2} aria-hidden="true" />
-        <span>Cargado · {when}</span>
-      </li>
-    )
-  }
-  if (entry.action === 'voided') {
-    return (
-      <li className="history-item is-voided">
-        <Ban size={16} strokeWidth={2} aria-hidden="true" />
-        <span>Anulado · {when} · “{entry.after.voidReason}”</span>
-      </li>
-    )
-  }
+/** Mandatory-reason confirmation used to void expenses and purchases. */
+export function VoidForm({ title, explanation, confirmLabel, reason, setReason, onCancel, onConfirm }) {
   return (
-    <li className="history-item">
-      <Pencil size={16} strokeWidth={2} aria-hidden="true" />
-      <span>
-        Editado · {when}
-        <ul className="history-changes">
-          {Object.keys(entry.after).map((field) => (
-            <li key={field}>
-              {FIELD_LABELS[field] ?? field}: {describe(field, entry.before[field], getCategory)} → {describe(field, entry.after[field], getCategory)}
-            </li>
-          ))}
-        </ul>
-      </span>
-    </li>
+    <motion.div
+      className="void-form glass"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      transition={softSpring}
+    >
+      <label htmlFor="void-reason" className="card-title">{title}</label>
+      <p className="muted-sm">{explanation}</p>
+      <textarea
+        id="void-reason"
+        className="void-textarea"
+        rows={2}
+        maxLength={120}
+        placeholder="Ej: lo cargué dos veces"
+        value={reason}
+        autoFocus
+        onChange={(e) => setReason(e.target.value)}
+      />
+      <div className="detail-actions">
+        <Pressable className="btn btn-glass" onClick={onCancel}>Cancelar</Pressable>
+        <Pressable className="btn btn-danger" disabled={reason.trim().length < 3} onClick={onConfirm}>
+          {confirmLabel}
+        </Pressable>
+      </div>
+    </motion.div>
   )
 }

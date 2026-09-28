@@ -7,11 +7,15 @@ import { monthTotal } from '../lib/expenses'
 import { formatMoney } from '../lib/format'
 
 const MONTHS_BACK = 12
+const MONTHS_AHEAD = 12
 
 export default function MonthPickerSheet({ open, value, onChange, onClose }) {
   const { expenses } = usePersonalStore()
   const current = monthKey()
-  const months = Array.from({ length: MONTHS_BACK }, (_, i) => shiftMonth(current, -i))
+  // Future months only appear when they already have installments.
+  const future = Array.from({ length: MONTHS_AHEAD }, (_, i) => shiftMonth(current, MONTHS_AHEAD - i))
+    .filter((key) => monthTotal(expenses, key) > 0)
+  const months = [...future, ...Array.from({ length: MONTHS_BACK }, (_, i) => shiftMonth(current, -i))]
 
   return (
     <Sheet open={open} onClose={onClose} labelledBy="month-title" space="personal">

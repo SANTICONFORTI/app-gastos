@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import {
-  LayoutGrid, Bell, Home, BarChart3, Target, UserRound, Users, History,
+  LayoutGrid, Bell, Home, BarChart3, CreditCard, UserRound, Users, History,
 } from 'lucide-react'
 import SpaceSwitcher from './components/SpaceSwitcher'
 import BottomNav from './components/BottomNav'
@@ -9,6 +9,7 @@ import ExpenseSheet from './components/ExpenseSheet'
 import ExpenseDetailSheet from './components/ExpenseDetailSheet'
 import MonthPickerSheet from './components/MonthPickerSheet'
 import AllMovementsSheet from './components/AllMovementsSheet'
+import PlanDetailSheet from './components/PlanDetailSheet'
 import Pressable from './components/Pressable'
 import Avatar from './components/Avatar'
 import Toast from './components/Toast'
@@ -22,8 +23,8 @@ import { monthKey } from './lib/dates'
 const TABS = {
   personal: [
     { id: 'home', label: 'Inicio', Icon: Home },
+    { id: 'installments', label: 'Cuotas', Icon: CreditCard },
     { id: 'stats', label: 'Estadísticas', Icon: BarChart3, stage: 'etapa 4', title: 'Estadísticas' },
-    { id: 'goals', label: 'Metas de ahorro', Icon: Target, stage: 'etapa 10', title: 'Metas de ahorro' },
     { id: 'profile', label: 'Perfil', Icon: UserRound, stage: 'etapa 5', title: 'Tu perfil' },
   ],
   group: [
@@ -35,6 +36,9 @@ const TABS = {
 }
 
 const THEME_COLOR = { personal: '#0A1428', group: '#0E1230' }
+
+// Loaded on demand: it brings Chart.js, which the home screen doesn't need.
+const Installments = lazy(() => import('./screens/Installments'))
 
 // Personal slides in from the left, Group from the right.
 const slide = {
@@ -48,7 +52,8 @@ export default function App() {
   const [space, setSpace] = useState('personal')
   const [tabs, setTabs] = useState({ personal: 'home', group: 'home' })
   const [month, setMonth] = useState(monthKey())
-  // Only one sheet at a time: { type: 'expense', expense? } | { type: 'detail', id } | { type: 'month' } | { type: 'all' }
+  // Only one sheet at a time:
+  // { type: 'expense', expense?, installments? } | { type: 'detail', id } | { type: 'plan', id } | { type: 'month' } | { type: 'all' }
   const [sheet, setSheet] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
@@ -124,6 +129,8 @@ export default function App() {
                     onPickMonth={() => setSheet({ type: 'month' })}
                     onAdd={() => setSheet({ type: 'expense' })}
                     onOpenExpense={(id) => setSheet({ type: 'detail', id })}
+                    onOpenPlan={(id) => setSheet({ type: 'plan', id })}
+                    onOpenInstallments={() => setTabs((t) => ({ ...t, personal: 'installments' }))}
                     onSeeAll={() => setSheet({ type: 'all' })}
                     onSoon={soon}
                     onNotice={showToast}
@@ -131,6 +138,14 @@ export default function App() {
                 ) : (
                   <GroupHome onSoon={soon} />
                 )
+              ) : activeTab === 'installments' ? (
+                <Suspense fallback={<div className="screen-loading" aria-busy="true" />}>
+                  <Installments
+                    onAddInstallments={() => setSheet({ type: 'expense', installments: true })}
+                    onOpenPlan={(id) => setSheet({ type: 'plan', id })}
+                    onOpenExpense={(id) => setSheet({ type: 'detail', id })}
+                  />
+                </Suspense>
               ) : (
                 <ComingSoon Icon={tabInfo.Icon} title={tabInfo.title} stage={tabInfo.stage} />
               )}
@@ -149,6 +164,7 @@ export default function App() {
         <ExpenseSheet
           open={sheet?.type === 'expense'}
           expense={sheet?.type === 'expense' ? sheet.expense : undefined}
+          startInInstallments={sheet?.type === 'expense' && Boolean(sheet.installments)}
           initialSpace={space}
           groupName={demoGroup.name}
           groupSize={demoGroup.members.length}
@@ -160,6 +176,13 @@ export default function App() {
           expenseId={sheet?.type === 'detail' ? sheet.id : null}
           onClose={closeSheet}
           onEdit={(expense) => setSheet({ type: 'expense', expense })}
+          onOpenPlan={(id) => setSheet({ type: 'plan', id })}
+          onDone={finish}
+        />
+        <PlanDetailSheet
+          planId={sheet?.type === 'plan' ? sheet.id : null}
+          onClose={closeSheet}
+          onOpenExpense={(id) => setSheet({ type: 'detail', id })}
           onDone={finish}
         />
         <MonthPickerSheet open={sheet?.type === 'month'} value={month} onChange={setMonth} onClose={closeSheet} />

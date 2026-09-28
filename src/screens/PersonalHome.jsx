@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { DollarSign, CreditCard, Plus, BarChart3, SlidersHorizontal, ChevronDown, Receipt } from 'lucide-react'
+import { DollarSign, CreditCard, Plus, BarChart3, SlidersHorizontal, ChevronDown, Receipt, PartyPopper, CalendarClock } from 'lucide-react'
 import Amount from '../components/Amount'
 import ChipCard from '../components/ChipCard'
 import CategoryIcon from '../components/CategoryIcon'
@@ -11,14 +11,18 @@ import useDollarRates from '../hooks/useDollarRates'
 import { monthKey, monthName, shiftMonth } from '../lib/dates'
 import { expensesOfMonth, monthTotal, totalsByCategory } from '../lib/expenses'
 import { formatMoney } from '../lib/format'
+import { committedByMonth, planProgress } from '../lib/installments'
 import { listContainer, listItem } from '../lib/motion'
 
 const MAX_SEGMENTS = 5
 const RECENT_COUNT = 5
 
-export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onSeeAll, onSoon, onNotice }) {
+export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onOpenPlan, onOpenInstallments, onSeeAll, onSoon, onNotice }) {
   const store = usePersonalStore()
   const rates = useDollarRates()
+  const nextMonth = shiftMonth(monthKey(), 1)
+  const committedNext = committedByMonth(store.expenses, nextMonth, 1)[0].total
+  const finishing = store.plans.filter((p) => planProgress(p).state === 'last')
 
   const isCurrentMonth = month === monthKey()
   const total = monthTotal(store.expenses, month)
@@ -29,7 +33,7 @@ export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense,
 
   function rateChip(type, label, color, Icon) {
     const q = rates.data?.quotes?.[type]
-    const title = q ? formatMoney(Math.round(q.sell)) :rates.status === 'loading' ? 'Cargando…' : 'Sin datos'
+    const title = q ? formatMoney(Math.round(q.sell)) : rates.status === 'loading' ? 'Cargando…' : 'Sin datos'
     const subtitle = rates.status === 'stale' ? `${label} (sin conexión)` : label
     return (
       <ChipCard
@@ -70,6 +74,30 @@ export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense,
           Ver análisis
         </Pressable>
       </motion.div>
+
+      {isCurrentMonth && finishing.map((plan) => (
+        <motion.button
+          key={plan.id}
+          variants={listItem}
+          type="button"
+          className="finish-banner finish-banner-btn"
+          onClick={() => onOpenPlan(plan.id)}
+        >
+          <PartyPopper size={18} strokeWidth={2} aria-hidden="true" />
+          <span>¡Este mes terminás de pagar <strong>{plan.note || store.getCategory(plan.categoryId).name}</strong>!</span>
+        </motion.button>
+      ))}
+
+      {committedNext > 0 && (
+        <motion.div variants={listItem}>
+          <ChipCard
+            icon={<CategoryIcon color="#8B93FF" Icon={CalendarClock} size={38} />}
+            title={`${formatMoney(Math.round(committedNext))} en cuotas`}
+            subtitle={`Comprometido para ${monthName(nextMonth)}`}
+            onClick={onOpenInstallments}
+          />
+        </motion.div>
+      )}
 
       {total > 0 ? (
         <CategorySummary
