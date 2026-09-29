@@ -26,3 +26,6 @@ Thumbs.db
 
 # Configuración local de Claude
 .claude/settings.local.json
+
+# Exportaciones de prueba descargadas en la carpeta del proyecto
+*.csv
