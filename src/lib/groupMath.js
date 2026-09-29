@@ -26,7 +26,7 @@ const rateOf = (e) => (e.currency === 'USD' ? Number(e.exchange_rate ?? 0) : 1)
  * Net balance per member, in cents: positive = the group owes them, negative = they owe.
  * Voided expenses and payments don't count.
  */
-export function balancesByMember(expenses, settlements) {
+export function balancesByMember(expenses, settlements, extraTransfers = []) {
   const net = {}
   const add = (id, cents) => { net[id] = (net[id] ?? 0) + cents }
 
@@ -41,6 +41,11 @@ export function balancesByMember(expenses, settlements) {
     if (s.status !== 'active') continue
     add(s.from_user, toCents(Number(s.amount)))
     add(s.to_user, -toCents(Number(s.amount)))
+  }
+  // Debts coming from closed events (from owes to).
+  for (const t of extraTransfers) {
+    add(t.from, -toCents(t.amount))
+    add(t.to, toCents(t.amount))
   }
   return net
 }

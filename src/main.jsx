@@ -9,16 +9,22 @@ import WelcomeScreen from './screens/WelcomeScreen'
 import NewPasswordScreen from './screens/NewPasswordScreen'
 import StatusScreen from './screens/StatusScreen'
 import ErrorBoundary from './components/ErrorBoundary'
+import PublicEventPage from './screens/PublicEventPage'
+import { EventsStoreProvider } from './store/EventsStore'
 import { capturePendingInviteCode } from './lib/inviteLink'
 import './styles/global.css'
 import './styles/components.css'
 
 capturePendingInviteCode()
 
+// Public event link: /?evento=TOKEN works without logging in.
+const publicEventToken = new URLSearchParams(window.location.search).get('evento')
+
 /** Decides what to show depending on the session. */
 function Gate() {
   const { status, user, profile, profileError, reloadProfile, signOut } = useAuth()
 
+  if (publicEventToken) return <PublicEventPage token={publicEventToken} />
   if (status === 'loading') return <StatusScreen loading />
   if (status === 'recovery') return <NewPasswordScreen />
   if (status === 'signed-out') return <AuthScreen />
@@ -36,7 +42,9 @@ function Gate() {
 
   return (
     <PersonalStoreProvider key={user.id}>
-      <App />
+      <EventsStoreProvider>
+        <App />
+      </EventsStoreProvider>
     </PersonalStoreProvider>
   )
 }

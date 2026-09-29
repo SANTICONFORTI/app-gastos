@@ -4,20 +4,23 @@ import Sheet from './Sheet'
 import SheetHeader from './SheetHeader'
 import Pressable from './Pressable'
 import GroupAvatar from './GroupAvatar'
+import EventsCard from './EventsCard'
 import { useGroups } from '../store/GroupsStore'
+import { useEvents } from '../store/EventsStore'
 import { friendlyError } from '../lib/db'
 
 /** Switch groups, answer invitations, create or join a group. */
-export default function GroupPickerSheet({ open, onClose, onCreate, onJoin, onNotice }) {
+export default function GroupPickerSheet({ open, onClose, onCreate, onJoin, onNewStandaloneEvent, onOpenEvent, onNotice }) {
   return (
     <Sheet open={open} onClose={onClose} labelledBy="group-picker-title" space="group">
-      <Picker onClose={onClose} onCreate={onCreate} onJoin={onJoin} onNotice={onNotice} />
+      <Picker onClose={onClose} onCreate={onCreate} onJoin={onJoin} onNewStandaloneEvent={onNewStandaloneEvent} onOpenEvent={onOpenEvent} onNotice={onNotice} />
     </Sheet>
   )
 }
 
-function Picker({ onClose, onCreate, onJoin, onNotice }) {
+function Picker({ onClose, onCreate, onJoin, onNewStandaloneEvent, onOpenEvent, onNotice }) {
   const groups = useGroups()
+  const events = useEvents()
   const [busyId, setBusyId] = useState(null)
   const mine = groups.memberships.filter((m) => m.status !== 'invited')
 
@@ -80,6 +83,15 @@ function Picker({ onClose, onCreate, onJoin, onNotice }) {
           })}
         </ul>
       )}
+
+      <EventsCard
+        title="Eventos sueltos"
+        events={events.standaloneEvents}
+        canCreate
+        onCreate={onNewStandaloneEvent}
+        onOpen={onOpenEvent}
+        emptyText="Para una juntada puntual sin armar un grupo: en segundos, con invitados sin cuenta."
+      />
 
       <div className="detail-actions">
         <Pressable className="btn btn-glass btn-lg" onClick={onJoin}>

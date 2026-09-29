@@ -16,6 +16,11 @@ import JoinGroupSheet from './components/JoinGroupSheet'
 import InviteSheet from './components/InviteSheet'
 import GroupExpenseDetailSheet from './components/GroupExpenseDetailSheet'
 import { SettleSheet, SettlementDetailSheet } from './components/SettleSheet'
+import EventFormSheet from './components/EventFormSheet'
+import EventSheet from './components/EventSheet'
+import EventExpenseSheet from './components/EventExpenseSheet'
+import EventShareSheet from './components/EventShareSheet'
+import { useEvents } from './store/EventsStore'
 import Pressable from './components/Pressable'
 import UserAvatar from './components/UserAvatar'
 import Toast from './components/Toast'
@@ -96,6 +101,7 @@ export default function App() {
 function Shell({ showToast }) {
   const { profile } = useAuth()
   const groups = useGroups()
+  const events = useEvents()
   const [space, setSpace] = useState('personal')
   const [tabs, setTabs] = useState({ personal: 'home', group: 'home' })
   const [month, setMonth] = useState(monthKey())
@@ -222,6 +228,8 @@ function Shell({ showToast }) {
             onOpenExpense={(id) => setSheet({ type: 'groupExpense', id })}
             onOpenSettlement={(id) => setSheet({ type: 'settlement', id })}
             onSettle={(transfer) => setSheet({ type: 'settle', transfer })}
+            onNewEvent={() => setSheet({ type: 'eventForm', groupId: groups.groupId })}
+            onOpenEvent={(id) => setSheet({ type: 'event', id })}
             onNotice={showToast}
           />
         )
@@ -320,6 +328,39 @@ function Shell({ showToast }) {
         onClose={closeSheet}
         onCreate={() => setSheet({ type: 'groupForm' })}
         onJoin={() => setSheet({ type: 'join' })}
+        onNewStandaloneEvent={() => setSheet({ type: 'eventForm', groupId: null })}
+        onOpenEvent={(id) => setSheet({ type: 'event', id })}
+        onNotice={showToast}
+      />
+
+      {/* Events */}
+      <EventFormSheet
+        open={sheet?.type === 'eventForm'}
+        groupId={sheet?.type === 'eventForm' ? sheet.groupId : null}
+        onClose={closeSheet}
+        onCreated={(id) => {
+          setSheet({ type: 'event', id })
+          showToast('¡Evento creado!')
+        }}
+      />
+      <EventSheet
+        eventId={sheet?.type === 'event' ? sheet.id : null}
+        onClose={closeSheet}
+        onAddExpense={(ev) => setSheet({ type: 'eventExpense', eventId: ev.id })}
+        onShare={(ev) => setSheet({ type: 'eventShare', id: ev.id })}
+        onNotice={showToast}
+      />
+      <EventExpenseSheet
+        event={sheet?.type === 'eventExpense' ? events.getEvent(sheet.eventId) : null}
+        onClose={() => setSheet({ type: 'event', id: sheet.eventId })}
+        onDone={(message) => {
+          setSheet({ type: 'event', id: sheet.eventId })
+          showToast(message)
+        }}
+      />
+      <EventShareSheet
+        eventId={sheet?.type === 'eventShare' ? sheet.id : null}
+        onClose={() => setSheet({ type: 'event', id: sheet.id })}
         onNotice={showToast}
       />
       <GroupFormSheet

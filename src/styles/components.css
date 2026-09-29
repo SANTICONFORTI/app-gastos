@@ -2225,6 +2225,125 @@ button.movement-btn:hover .movement:not(.movement-voided) { background: rgba(255
 .bar-label { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; min-width: 0; }
 .bar-value { font-size: 13px; color: var(--text-2); font-weight: 600; }
 
+/* ---------- Stage 7: events ---------- */
+
+.guest-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.guest-chip,
+.person-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.guest-chip { padding-left: 14px; }
+
+.guest-chip button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+button.person-chip { min-height: 44px; border: 1px solid var(--glass-border); }
+.person-chip.is-active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+
+.guest-tag {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--warning);
+}
+
+.add-guest { margin-top: 10px; }
+.reported-icon { color: var(--warning); flex-shrink: 0; }
+.event-actions { display: flex; flex-direction: column; gap: 10px; }
+
+.event-row {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 18px;
+  background: none;
+  text-align: left;
+}
+
+.event-row:hover { background: rgba(255, 255, 255, 0.03); }
+.event-row.is-closed { opacity: 0.65; }
+
+.event-icon {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.public-event {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 32px);
+}
+
+.public-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.public-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--on-accent);
+  background: linear-gradient(180deg, var(--grad-a), var(--grad-b));
+}
+
+.public-pay {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 22px;
+}
+
+.public-pay-line { font-size: 15px; }
+.public-pay .form-notice { display: flex; align-items: center; gap: 6px; justify-content: center; }
+
+.public-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  text-align: center;
+  margin-top: 12px;
+}
+
 /* Invisible hit area so compact buttons still get a 44px touch target. */
 .switcher-option,
 .currency-option,

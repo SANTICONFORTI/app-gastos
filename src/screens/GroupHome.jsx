@@ -5,7 +5,10 @@ import GroupAvatar from '../components/GroupAvatar'
 import UserAvatar from '../components/UserAvatar'
 import MovementRow from '../components/MovementRow'
 import Pressable from '../components/Pressable'
+import EventsCard from '../components/EventsCard'
 import { useGroups } from '../store/GroupsStore'
+import { useEvents } from '../store/EventsStore'
+import { closedEventTransfersForGroup } from '../lib/eventMath'
 import { useAuth } from '../store/AuthProvider'
 import { formatWhen, monthKey, monthName } from '../lib/dates'
 import { formatMoney } from '../lib/format'
@@ -17,8 +20,9 @@ const MAX_AVATARS = 3
 const RECENT = 30
 const firstName = (m) => (m?.profile?.display_name || m?.profile?.username || 'Alguien').split(' ')[0]
 
-export default function GroupHome({ onOpenPicker, onCreate, onJoin, onOpenExpense, onOpenSettlement, onSettle, onNotice }) {
+export default function GroupHome({ onOpenPicker, onCreate, onJoin, onOpenExpense, onOpenSettlement, onSettle, onNewEvent, onOpenEvent, onNotice }) {
   const groups = useGroups()
+  const events = useEvents()
   const { user } = useAuth()
 
   if (groups.listStatus === 'loading') return <div className="screen-loading" aria-busy="true" />
@@ -61,7 +65,8 @@ export default function GroupHome({ onOpenPicker, onCreate, onJoin, onOpenExpens
   const monthTotal = groups.expenses
     .filter((e) => e.status === 'active' && monthKey(e.spent_at) === month)
     .reduce((s, e) => s + groupExpenseArs(e), 0)
-  const net = balancesByMember(groups.expenses, groups.settlements)
+  const groupEvents = events.eventsOfGroup(group.id)
+  const net = balancesByMember(groups.expenses, groups.settlements, closedEventTransfersForGroup(groupEvents))
   const transfers = simplifyDebts(net)
   const myNet = (net[user.id] ?? 0) / 100
 
@@ -137,6 +142,17 @@ export default function GroupHome({ onOpenPicker, onCreate, onJoin, onOpenExpens
           )
         })}
       </motion.section>
+
+      <motion.div variants={listItem}>
+        <EventsCard
+          title="Eventos"
+          events={groupEvents}
+          canCreate={groups.isAdmin}
+          onCreate={onNewEvent}
+          onOpen={onOpenEvent}
+          emptyText={groups.isAdmin ? 'Armá un evento para una juntada o una salida: tiene su propia cuenta y pueden sumarse invitados sin cuenta.' : 'Todavía no hay eventos en el grupo.'}
+        />
+      </motion.div>
 
       <motion.section variants={listItem} aria-labelledby="group-movements">
         <div className="section-head">
@@ -220,11 +236,11 @@ function NoGroups({ invitations, onOpenPicker, onCreate, onJoin }) {
         <span className="coming-soon-icon glass"><Users size={26} strokeWidth={2} /></span>
         <p className="card-title">Compartí gastos con tu gente</p>
         <p className="muted-sm">Armá un grupo para el depto, un viaje o el asado. Todos ven los gastos al instante y Puly calcula quién le debe a quién.</p>
-        {invitations > 0 && (
-          <Pressable className="btn btn-glass" onClick={onOpenPicker}>
-            Tenés {invitations} {invitations === 1 ? 'invitación' : 'invitaciones'} pendiente{invitations === 1 ? '' : 's'}
-          </Pressable>
-        )}
+        <Pressable className="btn btn-glass" onClick={onOpenPicker}>
+          {invitations > 0
+            ? `Tenés ${invitations} ${invitations === 1 ? 'invitación' : 'invitaciones'} pendiente${invitations === 1 ? '' : 's'}`
+            : 'Eventos sueltos (asado, salida…)'}
+        </Pressable>
         <div className="detail-actions empty-actions">
           <Pressable className="btn btn-glass btn-lg" onClick={onJoin}><Ticket size={16} strokeWidth={2.2} /> Tengo un código</Pressable>
           <Pressable className="btn btn-primary btn-lg" onClick={onCreate}><Plus size={16} strokeWidth={2.6} /> Crear grupo</Pressable>
