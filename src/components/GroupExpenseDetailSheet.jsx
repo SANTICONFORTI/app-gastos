@@ -13,7 +13,7 @@ import { usePersonalStore } from '../store/PersonalStore'
 import useReceiptUrl from '../hooks/useReceiptUrl'
 import { formatLongDate, formatWhen } from '../lib/dates'
 import { formatMoney } from '../lib/format'
-import { groupExpenseArs } from '../lib/groupMath'
+import { groupExpenseArs, isCharged } from '../lib/groupMath'
 import { describeGroupChanges } from '../lib/groupHistory'
 import { friendlyError } from '../lib/db'
 
@@ -50,13 +50,23 @@ function Detail({ expenseId, onClose, onEdit, onDone }) {
   const voided = expense.status === 'voided'
   const nameOf = (id) => groups.memberById[id]?.profile?.display_name ?? 'Alguien'
   const rate = expense.currency === 'USD' ? Number(expense.exchange_rate) : 1
+  const plan = expense.installment_plan_id ? groups.planById[expense.installment_plan_id] : null
+  const planVoided = plan?.status === 'voided'
+  const futureInstallments = plan
+    ? groups.expenses.filter((e) => e.installment_plan_id === plan.id && e.status === 'active' && !isCharged(e)).length
+    : 0
 
   async function confirmVoid() {
     setBusy(true)
     setError('')
     try {
-      await groups.voidExpense(expense.id, reason)
-      onDone('Gasto anulado. Queda en el historial del grupo')
+      if (plan) {
+        const count = await groups.voidPlan(plan.id, reason)
+        onDone(`Compra anulada: se anularon ${count} ${count === 1 ? 'cuota futura' : 'cuotas futuras'}`)
+      } else {
+        await groups.voidExpense(expense.id, reason)
+        onDone('Gasto anulado. Queda en el historial del grupo')
+      }
     } catch (e) {
       setError(friendlyError(e))
       setBusy(false)
@@ -71,6 +81,14 @@ function Detail({ expenseId, onClose, onEdit, onDone }) {
         <CategoryIcon color={category.color} Icon={category.Icon} size={56} />
         <span className="detail-name">{expense.note || category.name}</span>
         <Amount value={groupExpenseArs(expense)} className="detail-amount" />
+        {plan && (
+          <>
+            <span className="installment-badge">Cuota {expense.installment_number} de {plan.installment_count}</span>
+            <span className="muted-sm">
+              Compra total {formatMoney(Number(plan.total_amount) * rate)}{plan.card ? ` · ${plan.card}` : ''}
+            </span>
+          </>
+        )}
         {expense.currency === 'USD' && (
           <span className="muted-sm">
             US$ {new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(expense.amount)} · dólar {expense.rate_type} a {formatMoney(rate)}
@@ -142,14 +160,23 @@ function Detail({ expenseId, onClose, onEdit, onDone }) {
         </ol>
       </section>
 
-      {groups.isAdmin && !voided && (
+      {plan && planVoided && (
+        <div className="void-banner" role="note">
+          <Ban size={18} strokeWidth={2} aria-hidden="true" />
+          <span>La compra fue anulada por {nameOf(plan.voided_by)} · “{plan.void_reason}”. Las cuotas que ya se cobraron siguen contando.</span>
+        </div>
+      )}
+
+      {groups.isAdmin && !voided && !planVoided && (
         <AnimatePresence mode="wait" initial={false}>
           {voiding ? (
             <VoidForm
               key="void"
-              title="¿Por qué lo anulás?"
-              explanation="No se borra: queda tachado para todos, con tu nombre, la fecha y este motivo."
-              confirmLabel="Anular gasto"
+              title={plan ? '¿Por qué anulás la compra?' : '¿Por qué lo anulás?'}
+              explanation={plan
+                ? `Se anulan las ${futureInstallments} cuotas de los próximos meses. Las de este mes y las anteriores quedan, porque ya se cobraron.`
+                : 'No se borra: queda tachado para todos, con tu nombre, la fecha y este motivo.'}
+              confirmLabel={plan ? 'Anular compra' : 'Anular gasto'}
               reason={reason}
               setReason={setReason}
               busy={busy}
@@ -159,11 +186,16 @@ function Detail({ expenseId, onClose, onEdit, onDone }) {
             />
           ) : (
             <motion.div key="actions" className="detail-actions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Pressable className="btn btn-glass btn-lg" onClick={() => onEdit(expense)}><Pencil size={16} strokeWidth={2.2} /> Editar</Pressable>
-              <Pressable className="btn btn-danger-ghost btn-lg" onClick={() => setVoiding(true)}><Ban size={16} strokeWidth={2.2} /> Anular</Pressable>
+              {!plan && <Pressable className="btn btn-glass btn-lg" onClick={() => onEdit(expense)}><Pencil size={16} strokeWidth={2.2} /> Editar</Pressable>}
+              <Pressable className="btn btn-danger-ghost btn-lg" onClick={() => setVoiding(true)}>
+                <Ban size={16} strokeWidth={2.2} /> {plan ? 'Anular compra' : 'Anular'}
+              </Pressable>
             </motion.div>
           )}
         </AnimatePresence>
+      )}
+      {groups.isAdmin && plan && !planVoided && !voided && !voiding && (
+        <p className="muted-sm detail-note">Para cambiar el monto, las cuotas o la división, anulá la compra y cargala de nuevo.</p>
       )}
       {!groups.isAdmin && !voided && <p className="muted-sm detail-note">Solo los admins pueden editar o anular gastos.</p>}
     </div>

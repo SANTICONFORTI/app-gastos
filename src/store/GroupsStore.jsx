@@ -27,7 +27,7 @@ export function GroupsStoreProvider({ children }) {
   const [memberships, setMemberships] = useState([])
   const [listStatus, setListStatus] = useState('loading')
   const [selectedId, setSelectedId] = useState(readSelected)
-  const [current, setCurrent] = useState({ groupId: null, members: [], expenses: [], settlements: [], invites: [], status: 'idle' })
+  const [current, setCurrent] = useState({ groupId: null, members: [], expenses: [], settlements: [], invites: [], plans: [], status: 'idle' })
   const [online, setOnline] = useState(() => new Set())
 
   // ----- My groups -----
@@ -70,18 +70,19 @@ export function GroupsStoreProvider({ children }) {
   const loadCurrent = useCallback(async (gid, isActive, isAdmin) => {
     if (!gid) return
     if (!isActive) {
-      setCurrent({ groupId: gid, members: [], expenses: [], settlements: [], invites: [], status: 'ready' })
+      setCurrent({ groupId: gid, members: [], expenses: [], settlements: [], invites: [], plans: [], status: 'ready' })
       return
     }
-    const [members, expenses, settlements, invites] = await Promise.all([
+    const [members, expenses, settlements, invites, plans] = await Promise.all([
       supabase.from('group_members').select(MEMBER_FIELDS).eq('group_id', gid),
       supabase.from('expenses').select('*').eq('group_id', gid).order('spent_at', { ascending: false }),
       supabase.from('settlements').select('*').eq('group_id', gid).order('created_at', { ascending: false }),
       isAdmin
         ? supabase.from('group_invites').select('*').eq('group_id', gid).eq('active', true).order('created_at', { ascending: false })
         : Promise.resolve({ data: [] }),
+      supabase.from('installment_plans').select('*').eq('group_id', gid).order('created_at', { ascending: false }),
     ])
-    const error = members.error || expenses.error || settlements.error || invites.error
+    const error = members.error || expenses.error || settlements.error || invites.error || plans.error
     if (error) {
       setCurrent((c) => ({ ...c, status: c.groupId === gid && c.status === 'ready' ? 'ready' : 'error' }))
       return
@@ -92,6 +93,7 @@ export function GroupsStoreProvider({ children }) {
       expenses: expenses.data,
       settlements: settlements.data,
       invites: invites.data,
+      plans: plans.data,
       status: 'ready',
     })
   }, [])
@@ -101,7 +103,7 @@ export function GroupsStoreProvider({ children }) {
 
   useEffect(() => {
     if (!groupId) return
-    setCurrent((c) => (c.groupId === groupId ? c : { groupId, members: [], expenses: [], settlements: [], invites: [], status: 'loading' }))
+    setCurrent((c) => (c.groupId === groupId ? c : { groupId, members: [], expenses: [], settlements: [], invites: [], plans: [], status: 'loading' }))
     loadCurrent(groupId, isActiveMember, isAdmin)
   }, [groupId, isActiveMember, isAdmin, loadCurrent])
 
@@ -137,6 +139,7 @@ export function GroupsStoreProvider({ children }) {
         refresh()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `group_id=eq.${groupId}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'installment_plans', filter: `group_id=eq.${groupId}` }, refresh)
       .on('presence', { event: 'sync' }, () => {
         setOnline(new Set(Object.keys(channel.presenceState())))
       })
@@ -287,6 +290,35 @@ export function GroupsStoreProvider({ children }) {
       return id
     },
 
+    /** Group purchase in installments; `splits` divide the total. */
+    async addInstallmentPlan(gid, input) {
+      const id = await call(supabase.rpc('create_group_installment_plan', {
+        p_group_id: gid,
+        p_paid_by: input.paidBy,
+        p_total_amount: input.totalAmount,
+        p_installment_count: input.installmentCount,
+        p_first_month: `${input.firstMonth}-01`,
+        p_purchased_at: input.purchasedAt,
+        p_currency: input.currency,
+        p_exchange_rate: input.exchangeRate,
+        p_rate_type: input.rateType,
+        p_category_id: input.categoryId,
+        p_note: input.note || null,
+        p_card: input.card || null,
+        p_receipt_path: input.receiptPath ?? null,
+        p_splits: input.splits,
+      }))
+      await reloadCurrent()
+      return id
+    },
+
+    /** Voids a group purchase: installments of the coming months are voided. */
+    async voidPlan(planId, reason) {
+      const count = await call(supabase.rpc('void_installment_plan', { p_plan_id: planId, p_reason: reason }))
+      await reloadCurrent()
+      return count
+    },
+
     async voidExpense(expenseId, reason) {
       await call(supabase.from('expenses').update({ status: 'voided', void_reason: reason.trim() }).eq('id', expenseId))
       await reloadCurrent()
@@ -324,7 +356,7 @@ export function GroupsStoreProvider({ children }) {
   }), [user.id, loadList, selectGroup, reloadCurrent])
 
   const value = useMemo(() => {
-    const ready = current.groupId === groupId ? current : { ...current, members: [], expenses: [], settlements: [], invites: [], status: 'loading' }
+    const ready = current.groupId === groupId ? current : { ...current, members: [], expenses: [], settlements: [], invites: [], plans: [], status: 'loading' }
     const activeMembers = ready.members.filter((m) => m.status === 'active')
     const memberById = Object.fromEntries(ready.members.map((m) => [m.user_id, m]))
     return {
@@ -347,6 +379,8 @@ export function GroupsStoreProvider({ children }) {
       expenses: ready.expenses,
       settlements: ready.settlements,
       invites: ready.invites,
+      plans: ready.plans ?? [],
+      planById: Object.fromEntries((ready.plans ?? []).map((p) => [p.id, p])),
       online,
       activity,
       ...actions,

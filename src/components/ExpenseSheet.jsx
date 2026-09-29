@@ -130,11 +130,6 @@ function ExpenseForm({ expense: personalExpense, groupExpense, startInInstallmen
 
   useEffect(() => () => receiptPreview && URL.revokeObjectURL(receiptPreview), [receiptPreview])
 
-  // Installments are personal only for now.
-  useEffect(() => {
-    if (isGroup) setInInstallments(false)
-  }, [isGroup])
-
   // Group expenses only use the default categories, which every member can see.
   useEffect(() => {
     if (isGroup && store.categories.find((c) => c.id === categoryId)?.custom) {
@@ -190,7 +185,8 @@ function ExpenseForm({ expense: personalExpense, groupExpense, startInInstallmen
       setError('Necesitamos la cotización del dólar para convertir el gasto.')
       return
     }
-    const splits = isGroup ? buildSplits({ amount, participants, mode: splitMode, custom: customSplit }) : null
+    // In installments the split divides the whole purchase; the database splits each installment.
+    const splits = isGroup ? buildSplits({ amount: totalAmount, participants, mode: splitMode, custom: customSplit }) : null
     if (isGroup && !splits) {
       setError(participants.length === 0
         ? 'Elegí entre quiénes se divide el gasto.'
@@ -226,6 +222,25 @@ function ExpenseForm({ expense: personalExpense, groupExpense, startInInstallmen
   }
 
   async function save(receiptId, splits) {
+    if (isGroup && inInstallments) {
+      await groups.addInstallmentPlan(groups.groupId, {
+        paidBy,
+        totalAmount,
+        installmentCount: count,
+        firstMonth,
+        purchasedAt: dateInputToIso(date),
+        currency,
+        exchangeRate: rate,
+        rateType: currency === 'USD' ? rateType : null,
+        categoryId,
+        note: note.trim(),
+        card: card.trim(),
+        receiptPath: receiptId,
+        splits,
+      })
+      onDone(`Compra en ${count} cuotas cargada en ${groups.selected.group.name}`)
+      return
+    }
     if (isGroup) {
       await groups.saveExpense(groups.groupId, {
         id: groupExpense?.id,
@@ -306,7 +321,7 @@ function ExpenseForm({ expense: personalExpense, groupExpense, startInInstallmen
 
   const receiptThumb = receiptPreview ?? existingReceiptUrl
   const amountLabel = !inInstallments ? 'Monto' : amountMode === 'total' ? 'Monto total' : 'Valor de cada cuota'
-  const showInstallmentOption = !editing && !isGroup
+  const showInstallmentOption = !editing
 
   return (
     <form className="expense-form" onSubmit={handleSubmit} noValidate>
@@ -401,7 +416,8 @@ function ExpenseForm({ expense: personalExpense, groupExpense, startInInstallmen
           >
             <GroupSplitFields
               members={groups.activeMembers}
-              amount={amount}
+              amount={totalAmount}
+              installments={inInstallments ? count : null}
               currency={currency}
               paidBy={paidBy}
               setPaidBy={setPaidBy}

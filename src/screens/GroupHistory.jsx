@@ -32,8 +32,19 @@ export default function GroupHistory() {
   const title = (h) => h.after?.note || h.before?.note || 'un gasto'
   const amount = (row) => formatMoney(Number(row?.amount ?? 0) * (row?.currency === 'USD' ? Number(row.exchange_rate) : 1))
 
+  // A purchase in installments writes one history row per installment: show it once.
+  const seen = new Set()
+  const expenseRows = rows.list.filter((h) => {
+    const planId = h.after?.installment_plan_id
+    if (!planId) return true
+    const key = `${planId}-${h.action}-${h.changed_at.slice(0, 19)}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
   const events = [
-    ...rows.list.map((h) => ({ key: `e${h.id}`, at: h.changed_at, kind: h.action, h })),
+    ...expenseRows.map((h) => ({ key: `e${h.id}`, at: h.changed_at, kind: h.action, h })),
     ...groups.settlements.flatMap((s) => [
       { key: `s${s.id}`, at: s.created_at, kind: 'payment', s },
       ...(s.status === 'voided' ? [{ key: `sv${s.id}`, at: s.voided_at, kind: 'payment-voided', s }] : []),
@@ -71,11 +82,17 @@ export default function GroupHistory() {
           }
           const h = ev.h
           const who = nameOf(h.changed_by)
+          const plan = h.after?.installment_plan_id ? groups.planById[h.after.installment_plan_id] : null
           if (h.action === 'created') {
             return (
               <li key={ev.key} className="timeline-item">
                 <span className="timeline-icon"><PlusCircle size={16} strokeWidth={2} /></span>
-                <span className="timeline-text">{who} cargó “{title(h)}” por {amount(h.after)}<span className="muted-sm">{formatWhen(ev.at)}</span></span>
+                <span className="timeline-text">
+                  {plan
+                    ? <>{who} cargó “{title(h)}” en {plan.installment_count} cuotas (total {amount({ ...h.after, amount: plan.total_amount })})</>
+                    : <>{who} cargó “{title(h)}” por {amount(h.after)}</>}
+                  <span className="muted-sm">{formatWhen(ev.at)}</span>
+                </span>
               </li>
             )
           }
@@ -83,7 +100,10 @@ export default function GroupHistory() {
             return (
               <li key={ev.key} className="timeline-item is-voided">
                 <span className="timeline-icon"><Ban size={16} strokeWidth={2} /></span>
-                <span className="timeline-text">{who} anuló “{title(h)}” · “{h.after?.void_reason}”<span className="muted-sm">{formatWhen(ev.at)}</span></span>
+                <span className="timeline-text">
+                  {plan ? <>{who} anuló la compra “{title(h)}” · “{plan.void_reason}”</> : <>{who} anuló “{title(h)}” · “{h.after?.void_reason}”</>}
+                  <span className="muted-sm">{formatWhen(ev.at)}</span>
+                </span>
               </li>
             )
           }

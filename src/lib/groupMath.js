@@ -1,6 +1,11 @@
 // Group money math. All balances are in pesos: USD expenses use the quote saved with them.
 
+import { monthKey } from './dates'
+
 const toCents = (n) => Math.round(n * 100)
+
+/** Installments of future months haven't been charged yet: they don't count in debts or lists. */
+export const isCharged = (e, current = monthKey()) => !e.installment_plan_id || monthKey(e.spent_at) <= current
 
 /** Splits `amount` between `userIds` in equal parts; the first ones absorb the leftover cents. */
 export function equalSplit(amount, userIds) {
@@ -25,8 +30,9 @@ export function balancesByMember(expenses, settlements) {
   const net = {}
   const add = (id, cents) => { net[id] = (net[id] ?? 0) + cents }
 
+  const current = monthKey()
   for (const e of expenses) {
-    if (e.status !== 'active' || !e.split_snapshot) continue
+    if (e.status !== 'active' || !e.split_snapshot || !isCharged(e, current)) continue
     const rate = rateOf(e)
     add(e.paid_by, toCents(Number(e.amount) * rate))
     for (const s of e.split_snapshot) add(s.user_id, -toCents(Number(s.amount) * rate))

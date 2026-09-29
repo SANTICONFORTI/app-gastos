@@ -9,7 +9,7 @@ import { useGroups } from '../store/GroupsStore'
 import { useAuth } from '../store/AuthProvider'
 import { formatWhen, monthKey, monthName } from '../lib/dates'
 import { formatMoney } from '../lib/format'
-import { balancesByMember, groupExpenseArs, simplifyDebts } from '../lib/groupMath'
+import { balancesByMember, groupExpenseArs, isCharged, simplifyDebts } from '../lib/groupMath'
 import { friendlyError } from '../lib/db'
 import { listContainer, listItem } from '../lib/motion'
 
@@ -66,7 +66,7 @@ export default function GroupHome({ onOpenPicker, onCreate, onJoin, onOpenExpens
   const myNet = (net[user.id] ?? 0) / 100
 
   const movements = [
-    ...groups.expenses.map((e) => ({ kind: 'expense', at: e.spent_at, row: e })),
+    ...groups.expenses.filter((e) => isCharged(e, month)).map((e) => ({ kind: 'expense', at: e.spent_at, row: e })),
     ...groups.settlements.map((s) => ({ kind: 'settlement', at: s.created_at, row: s })),
   ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, RECENT)
 
@@ -176,11 +176,13 @@ function GroupExpenseRow({ expense, onOpen }) {
   const payer = groups.memberById[expense.paid_by]
   const voider = groups.memberById[expense.voided_by]
   const count = expense.split_snapshot?.length ?? 0
+  const plan = expense.installment_plan_id ? groups.planById[expense.installment_plan_id] : null
+  const when = plan ? `Cuota ${expense.installment_number} de ${plan.installment_count}` : formatWhen(expense.spent_at)
   return (
     <MovementRow
       icon={<UserAvatar profile={payer?.profile} size={44} />}
       title={expense.note || 'Gasto'}
-      detail={`Pagó ${firstName(payer)} · ${formatWhen(expense.spent_at)}${expense.receipt_path ? ' · con ticket' : ''}`}
+      detail={`Pagó ${firstName(payer)} · ${when}${expense.receipt_path ? ' · con ticket' : ''}`}
       amount={groupExpenseArs(expense)}
       side={count ? `entre ${count}` : ''}
       voided={expense.status === 'voided'

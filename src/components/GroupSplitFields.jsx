@@ -32,7 +32,7 @@ export function splitStateFrom(expenseRow) {
 }
 
 /** "Who paid?" and "Split between" for a group expense. */
-export default function GroupSplitFields({ members, amount, currency, paidBy, setPaidBy, participants, setParticipants, mode, setMode, custom, setCustom }) {
+export default function GroupSplitFields({ members, amount, installments, currency, paidBy, setPaidBy, participants, setParticipants, mode, setMode, custom, setCustom }) {
   const symbol = currency === 'USD' ? 'US$' : '$'
   const fmt = (n) => (currency === 'USD' ? `US$ ${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(n)}` : formatMoney(n))
 
@@ -108,6 +108,11 @@ export default function GroupSplitFields({ members, amount, currency, paidBy, se
             )
           })}
         </ul>
+        {installments && (
+          <span className="field-hint">
+            Dividís el total de la compra. Cada mes, cada uno debe su parte de la cuota de ese mes (se reparte en {installments} cuotas).
+          </span>
+        )}
         {mode === 'custom' && amount > 0 && participants.length > 0 && (
           <span className={`field-hint ${missing === 0 ? 'status-available' : 'status-taken'}`} aria-live="polite">
             {missing === 0 ? 'La división suma el total' : missing > 0 ? `Faltan ${fmt(missing)} por repartir` : `Te pasaste por ${fmt(-missing)}`}
