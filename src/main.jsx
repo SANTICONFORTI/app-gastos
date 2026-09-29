@@ -13,10 +13,12 @@ import PublicEventPage from './screens/PublicEventPage'
 import { EventsStoreProvider } from './store/EventsStore'
 import { ExtrasStoreProvider } from './store/ExtrasStore'
 import { capturePendingInviteCode } from './lib/inviteLink'
+import { captureInstallPrompt } from './lib/device'
 import './styles/global.css'
 import './styles/components.css'
 
 capturePendingInviteCode()
+captureInstallPrompt()
 
 // Public event link: /?evento=TOKEN works without logging in.
 const publicEventToken = new URLSearchParams(window.location.search).get('evento')

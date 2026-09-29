@@ -1,9 +1,11 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  LayoutGrid, Bell, Home, BarChart3, CreditCard, UserRound, Users, History, Target, Gauge, Repeat, FileDown,
+  LayoutGrid, Bell, Home, BarChart3, CreditCard, UserRound, Users, History, Target, Gauge, Repeat, FileDown, BellRing, Smartphone,
 } from 'lucide-react'
 import ExportSheet from './components/ExportSheet'
+import DeviceSheet from './components/DeviceSheet'
+import { isStandalone, notify } from './lib/device'
 import MenuSheet from './components/MenuSheet'
 import GoalsSheet from './components/GoalsSheet'
 import BudgetsSheet from './components/BudgetsSheet'
@@ -141,11 +143,11 @@ function Shell({ showToast }) {
     if (!a) return
     const name = (id) => groups.memberById[id]?.profile?.display_name?.split(' ')[0] ?? 'Alguien'
     const groupName = groups.selected?.group.name ?? 'el grupo'
-    if (a.type === 'expense') {
-      showToast(`${name(a.row.created_by)} cargó “${a.row.note || 'un gasto'}” (${formatMoney(groupExpenseArs(a.row))}) en ${groupName}`)
-    } else {
-      showToast(`${name(a.row.created_by)} registró un pago de ${formatMoney(Number(a.row.amount))} en ${groupName}`)
-    }
+    const text = a.type === 'expense'
+      ? `${name(a.row.created_by)} cargó “${a.row.note || 'un gasto'}” (${formatMoney(groupExpenseArs(a.row))}) en ${groupName}`
+      : `${name(a.row.created_by)} registró un pago de ${formatMoney(Number(a.row.amount))} en ${groupName}`
+    showToast(text)
+    notify(`Puly · ${groupName}`, text)
   }, [groups.activity?.id])
 
   const closeSheet = () => setSheet(null)
@@ -162,6 +164,8 @@ function Shell({ showToast }) {
     { id: 'budgets', title: 'Presupuestos', subtitle: 'Un tope por categoría, con aviso', Icon: Gauge, color: '#FFB547', onClick: () => setSheet({ type: 'budgets' }) },
     { id: 'recurring', title: 'Gastos fijos', subtitle: 'Alquiler, suscripciones: se cargan solos', Icon: Repeat, color: '#8B93FF', onClick: () => setSheet({ type: 'recurring' }) },
     { id: 'export', title: 'Exportar', subtitle: 'Tus gastos en Excel o PDF', Icon: FileDown, color: '#5AC8FA', onClick: () => setSheet({ type: 'export' }) },
+    { id: 'notifications', title: 'Notificaciones', subtitle: 'Avisos cuando se carga algo en tus grupos', Icon: BellRing, color: '#FF7A96', onClick: () => setSheet({ type: 'device', mode: 'notifications' }) },
+    ...(isStandalone() ? [] : [{ id: 'install', title: 'Instalar Puly', subtitle: 'En la pantalla de inicio, como una app', Icon: Smartphone, color: '#A78BFA', onClick: () => setSheet({ type: 'device', mode: 'install' }) }]),
   ]
 
   function openBell() {
@@ -344,6 +348,7 @@ function Shell({ showToast }) {
       <BudgetsSheet open={sheet?.type === 'budgets'} onClose={closeSheet} onNotice={showToast} />
       <RecurringSheet open={sheet?.type === 'recurring'} onClose={closeSheet} onNotice={showToast} />
       <ExportSheet open={sheet?.type === 'export'} month={month} onClose={closeSheet} onNotice={showToast} />
+      <DeviceSheet open={sheet?.type === 'device'} mode={sheet?.type === 'device' ? sheet.mode : null} onClose={closeSheet} onNotice={showToast} />
       <AllMovementsSheet
         open={sheet?.type === 'all'}
         month={month}

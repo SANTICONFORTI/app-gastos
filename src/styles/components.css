@@ -2605,6 +2605,10 @@ button.person-chip { min-height: 44px; border: 1px solid var(--glass-border); }
 .reminder-row.budget-near .reminder-icon { color: var(--warning); }
 .reminder-row.budget-over .reminder-icon { color: #FF9AAA; }
 
+.install-steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.install-steps li { display: flex; align-items: center; gap: 12px; font-size: 15px; line-height: 1.35; }
+.install-steps svg { flex-shrink: 0; color: var(--accent); }
+
 /* Printable report (PDF export): hidden on screen, the only thing printed. */
 #print-root { display: none; }
 
