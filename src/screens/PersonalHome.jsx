@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { DollarSign, CreditCard, Plus, BarChart3, SlidersHorizontal, ChevronDown, Receipt, PartyPopper, CalendarClock } from 'lucide-react'
+import { DollarSign, CreditCard, Plus, BarChart3, SlidersHorizontal, ChevronDown, Receipt, PartyPopper, CalendarClock, Bug } from 'lucide-react'
 import Amount from '../components/Amount'
 import ChipCard from '../components/ChipCard'
 import CategoryIcon from '../components/CategoryIcon'
@@ -7,6 +7,7 @@ import DonutChart from '../components/DonutChart'
 import PersonalMovementRow from '../components/PersonalMovementRow'
 import Pressable from '../components/Pressable'
 import LocalImportCard from '../components/LocalImportCard'
+import { antsOfMonth } from '../components/AntsSheet'
 import { usePersonalStore } from '../store/PersonalStore'
 import useDollarRates from '../hooks/useDollarRates'
 import { monthKey, monthName, shiftMonth } from '../lib/dates'
@@ -18,7 +19,7 @@ import { listContainer, listItem } from '../lib/motion'
 const MAX_SEGMENTS = 5
 const RECENT_COUNT = 5
 
-export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onOpenPlan, onOpenInstallments, onOpenStats, onSeeAll, onNotice }) {
+export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onOpenPlan, onOpenInstallments, onOpenStats, onOpenAnts, onSeeAll, onNotice }) {
   const store = usePersonalStore()
   const rates = useDollarRates()
   const nextMonth = shiftMonth(monthKey(), 1)
@@ -66,6 +67,23 @@ export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense,
         {rateChip('blue', 'Dólar blue', '#4ADE80', DollarSign)}
         {rateChip('tarjeta', 'Dólar tarjeta', '#FFB547', CreditCard)}
       </motion.div>
+
+      {(() => {
+        const ants = antsOfMonth(store, month)
+        const antTotal = ants.reduce((s, a) => s + a.total, 0)
+        return (
+          <motion.div variants={listItem}>
+            <ChipCard
+              icon={<CategoryIcon color="#FFB547" Icon={Bug} size={38} />}
+              title={ants.length ? `${formatMoney(Math.round(antTotal))} en gastos hormiga` : 'Sin gastos hormiga'}
+              subtitle={ants.length
+                ? `${ants[0].label}${ants.length > 1 ? ` y ${ants.length - 1} más` : ''} · ${formatMoney(Math.round(ants.reduce((s, a) => s + a.yearly, 0)))} al año`
+                : 'Gastos chicos que se repiten'}
+              onClick={onOpenAnts}
+            />
+          </motion.div>
+        )
+      })()}
 
       <motion.div variants={listItem} className="action-row">
         <Pressable className="btn btn-primary btn-lg action-btn" onClick={onAdd}>

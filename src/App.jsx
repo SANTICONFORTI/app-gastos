@@ -16,6 +16,7 @@ import JoinGroupSheet from './components/JoinGroupSheet'
 import InviteSheet from './components/InviteSheet'
 import GroupExpenseDetailSheet from './components/GroupExpenseDetailSheet'
 import { SettleSheet, SettlementDetailSheet } from './components/SettleSheet'
+import AntsSheet from './components/AntsSheet'
 import EventFormSheet from './components/EventFormSheet'
 import EventSheet from './components/EventSheet'
 import EventExpenseSheet from './components/EventExpenseSheet'
@@ -198,6 +199,7 @@ function Shell({ showToast }) {
             onOpenPlan={(id) => setSheet({ type: 'plan', id })}
             onOpenInstallments={() => setTabs((t) => ({ ...t, personal: 'installments' }))}
             onOpenStats={() => setTabs((t) => ({ ...t, personal: 'stats' }))}
+            onOpenAnts={() => setSheet({ type: 'ants' })}
             onSeeAll={() => setSheet({ type: 'all' })}
             onNotice={showToast}
           />
@@ -314,6 +316,7 @@ function Shell({ showToast }) {
         onDone={finish}
       />
       <MonthPickerSheet open={sheet?.type === 'month'} value={month} onChange={setMonth} onClose={closeSheet} />
+      <AntsSheet open={sheet?.type === 'ants'} month={month} onClose={closeSheet} />
       <AllMovementsSheet
         open={sheet?.type === 'all'}
         month={month}

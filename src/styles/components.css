@@ -2344,6 +2344,40 @@ button.person-chip { min-height: 44px; border: 1px solid var(--glass-border); }
   margin-top: 12px;
 }
 
+/* ---------- Stage 8: ant expenses ---------- */
+
+.ants-yearly { font-size: 14px; color: var(--text-2); text-align: center; }
+.ants-yearly strong { color: var(--warning); }
+
+.ants-highlight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 20px;
+  background: rgba(255, 181, 71, 0.1);
+  border: 1px solid rgba(255, 181, 71, 0.35);
+  color: #FFD9A0;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.ants-highlight svg { flex-shrink: 0; color: var(--warning); }
+
+.ants-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.ant-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 22px;
+}
+
+.ant-head { display: flex; align-items: center; gap: 12px; }
+.ant-line { font-size: 14px; line-height: 1.4; }
+.ant-line strong { color: var(--warning); }
+
 /* Invisible hit area so compact buttons still get a 44px touch target. */
 .switcher-option,
 .currency-option,
