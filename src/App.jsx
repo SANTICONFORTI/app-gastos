@@ -1,8 +1,12 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  LayoutGrid, Bell, Home, BarChart3, CreditCard, UserRound, Users, History,
+  LayoutGrid, Bell, Home, BarChart3, CreditCard, UserRound, Users, History, Target, Gauge, Repeat,
 } from 'lucide-react'
+import MenuSheet from './components/MenuSheet'
+import GoalsSheet from './components/GoalsSheet'
+import BudgetsSheet from './components/BudgetsSheet'
+import RecurringSheet from './components/RecurringSheet'
 import SpaceSwitcher from './components/SpaceSwitcher'
 import BottomNav from './components/BottomNav'
 import ExpenseSheet from './components/ExpenseSheet'
@@ -152,6 +156,12 @@ function Shell({ showToast }) {
 
   const groupNotices = groups.invitations.length + (groups.isAdmin ? groups.pendingMembers.length : 0)
 
+  const menuItems = [
+    { id: 'goals', title: 'Metas de ahorro', subtitle: 'Juntá para algo y mirá cómo avanza', Icon: Target, color: '#4ADE80', onClick: () => setSheet({ type: 'goals' }) },
+    { id: 'budgets', title: 'Presupuestos', subtitle: 'Un tope por categoría, con aviso', Icon: Gauge, color: '#FFB547', onClick: () => setSheet({ type: 'budgets' }) },
+    { id: 'recurring', title: 'Gastos fijos', subtitle: 'Alquiler, suscripciones: se cargan solos', Icon: Repeat, color: '#8B93FF', onClick: () => setSheet({ type: 'recurring' }) },
+  ]
+
   function openBell() {
     if (groups.invitations.length) setSheet({ type: 'groupPicker' })
     else if (groups.isAdmin && groups.pendingMembers.length) goGroupTab('members')
@@ -205,6 +215,8 @@ function Shell({ showToast }) {
             onOpenStats={() => setTabs((t) => ({ ...t, personal: 'stats' }))}
             onOpenAnts={() => setSheet({ type: 'ants' })}
             onWrapped={(period) => setWrapped({ scope: 'personal', period })}
+            onOpenRecurring={() => setSheet({ type: 'recurring' })}
+            onOpenBudgets={() => setSheet({ type: 'budgets' })}
             onSeeAll={() => setSheet({ type: 'all' })}
             onNotice={showToast}
           />
@@ -246,7 +258,7 @@ function Shell({ showToast }) {
   return (
     <div className="app">
       <header className="topbar">
-        <Pressable className="btn btn-glass btn-icon" aria-label="Menú" onClick={() => showToast('Menú: próximamente')}>
+        <Pressable className="btn btn-glass btn-icon" aria-label="Menú" onClick={() => setSheet({ type: 'menu' })}>
           <LayoutGrid size={18} strokeWidth={2} />
         </Pressable>
         <SpaceSwitcher space={space} onChange={setSpace} />
@@ -323,6 +335,12 @@ function Shell({ showToast }) {
       <MonthPickerSheet open={sheet?.type === 'month'} value={month} onChange={setMonth} onClose={closeSheet} />
       <AntsSheet open={sheet?.type === 'ants'} month={month} onClose={closeSheet} />
       <WrappedLauncher request={wrapped} onClose={() => setWrapped(null)} onNotice={showToast} />
+
+      {/* Extras */}
+      <MenuSheet open={sheet?.type === 'menu'} items={menuItems} onClose={closeSheet} />
+      <GoalsSheet open={sheet?.type === 'goals'} onClose={closeSheet} onNotice={showToast} />
+      <BudgetsSheet open={sheet?.type === 'budgets'} onClose={closeSheet} onNotice={showToast} />
+      <RecurringSheet open={sheet?.type === 'recurring'} onClose={closeSheet} onNotice={showToast} />
       <AllMovementsSheet
         open={sheet?.type === 'all'}
         month={month}

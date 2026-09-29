@@ -7,6 +7,7 @@ import DonutChart from '../components/DonutChart'
 import PersonalMovementRow from '../components/PersonalMovementRow'
 import Pressable from '../components/Pressable'
 import LocalImportCard from '../components/LocalImportCard'
+import RemindersCard from '../components/RemindersCard'
 import { antsOfMonth } from '../components/AntsSheet'
 import { usePersonalStore } from '../store/PersonalStore'
 import useDollarRates from '../hooks/useDollarRates'
@@ -19,7 +20,7 @@ import { listContainer, listItem } from '../lib/motion'
 const MAX_SEGMENTS = 5
 const RECENT_COUNT = 5
 
-export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onOpenPlan, onOpenInstallments, onOpenStats, onOpenAnts, onWrapped, onSeeAll, onNotice }) {
+export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onOpenPlan, onOpenInstallments, onOpenStats, onOpenAnts, onWrapped, onOpenRecurring, onOpenBudgets, onSeeAll, onNotice }) {
   const store = usePersonalStore()
   const rates = useDollarRates()
   const nextMonth = shiftMonth(monthKey(), 1)
@@ -62,6 +63,8 @@ export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense,
       </motion.section>
 
       <LocalImportCard onNotice={onNotice} />
+
+      {isCurrentMonth && <RemindersCard onOpenRecurring={onOpenRecurring} onOpenBudgets={onOpenBudgets} />}
 
       {(() => {
         // First days of the month: offer last month's Wrapped. Dec 15 - Jan 15: the year's.

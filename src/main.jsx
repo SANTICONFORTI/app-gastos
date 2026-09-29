@@ -11,6 +11,7 @@ import StatusScreen from './screens/StatusScreen'
 import ErrorBoundary from './components/ErrorBoundary'
 import PublicEventPage from './screens/PublicEventPage'
 import { EventsStoreProvider } from './store/EventsStore'
+import { ExtrasStoreProvider } from './store/ExtrasStore'
 import { capturePendingInviteCode } from './lib/inviteLink'
 import './styles/global.css'
 import './styles/components.css'
@@ -43,7 +44,9 @@ function Gate() {
   return (
     <PersonalStoreProvider key={user.id}>
       <EventsStoreProvider>
-        <App />
+        <ExtrasStoreProvider>
+          <App />
+        </ExtrasStoreProvider>
       </EventsStoreProvider>
     </PersonalStoreProvider>
   )

@@ -2561,6 +2561,50 @@ button.person-chip { min-height: 44px; border: 1px solid var(--glass-border); }
 
 .wrapped-promo svg { flex-shrink: 0; color: var(--accent); }
 
+/* ---------- Stage 10: extras ---------- */
+
+.goal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.goal-pct { font-size: 20px; font-weight: 800; color: var(--goal-color, var(--accent)); }
+.ant-card .progress-fill { background: var(--goal-color, linear-gradient(90deg, var(--grad-b), var(--grad-a))); }
+.goal-body { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; }
+
+.budget-over { color: #FF9AAA; }
+.budget-near { color: var(--warning); }
+.is-paused { opacity: 0.55; }
+.day-input { width: 72px; text-align: center; }
+
+.reminders { gap: 6px; padding: 12px; }
+
+.reminder-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.reminder-row:hover { background: rgba(255, 255, 255, 0.03); }
+.reminder-icon { flex-shrink: 0; color: var(--accent); }
+.reminder-row.budget-near .reminder-icon { color: var(--warning); }
+.reminder-row.budget-over .reminder-icon { color: #FF9AAA; }
+
 /* Invisible hit area so compact buttons still get a 44px touch target. */
 .switcher-option,
 .currency-option,
