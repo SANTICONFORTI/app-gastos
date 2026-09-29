@@ -151,6 +151,8 @@ export function friendlyError(error) {
     [/duplicate key.*username|profiles_username_key/i, 'Ese @usuario ya está en uso.'],
     [/JWT expired|invalid JWT/i, 'Tu sesión venció. Volvé a entrar.'],
     [/The resource already exists/i, 'Ese archivo ya existe.'],
+    [/row-level security|permission denied/i, 'No tenés permiso para hacer eso en este grupo.'],
+    [/Código inválido o vencido/i, 'Ese código no existe o ya no sirve. Pedí uno nuevo.'],
   ]
   for (const [re, text] of known) if (re.test(msg)) return text
   // Our own database exceptions are already written in Spanish.

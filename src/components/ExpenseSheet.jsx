@@ -6,7 +6,10 @@ import SheetHeader from './SheetHeader'
 import Pressable from './Pressable'
 import PillToggle from './PillToggle'
 import CategoryPicker from './CategoryPicker'
+import GroupSplitFields, { buildSplits, splitStateFrom } from './GroupSplitFields'
 import { usePersonalStore } from '../store/PersonalStore'
+import { useGroups } from '../store/GroupsStore'
+import { useAuth } from '../store/AuthProvider'
 import useDollarRates from '../hooks/useDollarRates'
 import useReceiptUrl from '../hooks/useReceiptUrl'
 import { amountToInput, formatAmountInput, parseAmountInput } from '../lib/amountInput'
@@ -23,26 +26,45 @@ const MAX_COUNT = 60
 const round2 = (n) => Math.round(n * 100) / 100
 const fmtNumber = (n) => new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(n)
 
+/** A group expense row (snake_case) in the shape the form uses for personal expenses. */
+function fromGroupRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    amount: Number(row.amount),
+    currency: row.currency,
+    rateType: row.rate_type,
+    exchangeRate: row.exchange_rate == null ? null : Number(row.exchange_rate),
+    categoryId: row.category_id,
+    note: row.note ?? '',
+    spentAt: row.spent_at,
+    receiptId: row.receipt_path,
+  }
+}
+
 /**
- * Create or edit an expense. `expense` given = edit mode (personal, non-installment only).
+ * Create or edit an expense. `expense` = edit a personal expense; `groupExpense` = edit a group one.
  * The chosen destination recolors the whole sheet.
  */
-export default function ExpenseSheet({ open, expense, startInInstallments, initialSpace, groupName, groupSize, onClose, onDone, onNotice }) {
+export default function ExpenseSheet({ open, expense, groupExpense, startInInstallments, initialSpace, onClose, onDone, onNotice }) {
+  const groups = useGroups()
   const [dest, setDest] = useState(initialSpace)
 
   useEffect(() => {
-    if (open) setDest(expense || startInInstallments ? 'personal' : initialSpace)
-  }, [open, expense, startInInstallments, initialSpace])
+    if (!open) return
+    if (groupExpense) setDest('group')
+    else if (expense || startInInstallments || !groups.isAdmin) setDest('personal')
+    else setDest(initialSpace)
+  }, [open, expense, groupExpense, startInInstallments, initialSpace, groups.isAdmin])
 
   return (
     <Sheet open={open} onClose={onClose} labelledBy="expense-sheet-title" space={dest} tall>
       <ExpenseForm
         expense={expense}
+        groupExpense={groupExpense}
         startInInstallments={startInInstallments}
         dest={dest}
         setDest={setDest}
-        groupName={groupName}
-        groupSize={groupSize}
         onClose={onClose}
         onDone={onDone}
         onNotice={onNotice}
@@ -51,10 +73,22 @@ export default function ExpenseSheet({ open, expense, startInInstallments, initi
   )
 }
 
-function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, groupSize, onClose, onDone, onNotice }) {
+function ExpenseForm({ expense: personalExpense, groupExpense, startInInstallments, dest, setDest, onClose, onDone, onNotice }) {
   const store = usePersonalStore()
+  const groups = useGroups()
+  const { user } = useAuth()
   const rates = useDollarRates()
+  const expense = personalExpense ?? fromGroupRow(groupExpense)
   const editing = Boolean(expense)
+  const canUseGroup = groups.isAdmin && groups.status === 'ready'
+  const defaultCategories = store.categories.filter((c) => !c.custom)
+
+  // Group split
+  const initialSplit = groupExpense ? splitStateFrom(groupExpense) : null
+  const [paidBy, setPaidBy] = useState(groupExpense?.paid_by ?? user.id)
+  const [participants, setParticipants] = useState(initialSplit?.participants ?? groups.activeMembers.map((m) => m.user_id))
+  const [splitMode, setSplitMode] = useState(initialSplit?.mode ?? 'equal')
+  const [customSplit, setCustomSplit] = useState(initialSplit?.custom ?? {})
 
   const [currency, setCurrency] = useState(expense?.currency ?? 'ARS')
   const [rateType, setRateType] = useState(expense?.rateType ?? 'blue')
@@ -96,6 +130,18 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
 
   useEffect(() => () => receiptPreview && URL.revokeObjectURL(receiptPreview), [receiptPreview])
 
+  // Installments are personal only for now.
+  useEffect(() => {
+    if (isGroup) setInInstallments(false)
+  }, [isGroup])
+
+  // Group expenses only use the default categories, which every member can see.
+  useEffect(() => {
+    if (isGroup && store.categories.find((c) => c.id === categoryId)?.custom) {
+      setCategoryId(defaultCategories[0]?.id ?? null)
+    }
+  }, [isGroup, categoryId, store.categories, defaultCategories])
+
   function toggleInstallments() {
     setInInstallments((on) => {
       // USD bought in installments is almost always paid with a card.
@@ -128,8 +174,8 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (isGroup) {
-      onNotice('Los gastos de grupo llegan en la etapa 6')
+    if (isGroup && !canUseGroup) {
+      onNotice('Solo los admins del grupo pueden cargar gastos')
       return
     }
     if (!(amount > 0)) {
@@ -144,6 +190,13 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
       setError('Necesitamos la cotización del dólar para convertir el gasto.')
       return
     }
+    const splits = isGroup ? buildSplits({ amount, participants, mode: splitMode, custom: customSplit }) : null
+    if (isGroup && !splits) {
+      setError(participants.length === 0
+        ? 'Elegí entre quiénes se divide el gasto.'
+        : 'La división no suma el total del gasto.')
+      return
+    }
 
     setSaving(true)
     let receiptId = expense?.receiptId ?? null
@@ -152,7 +205,9 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
       receiptId = uploadedReceipt.current
       if (!receiptId) {
         try {
-          receiptId = await store.uploadReceipt(receiptBlob)
+          receiptId = isGroup
+            ? await groups.uploadReceipt(groups.groupId, receiptBlob)
+            : await store.uploadReceipt(receiptBlob)
           uploadedReceipt.current = receiptId
         } catch (err) {
           setSaving(false)
@@ -163,14 +218,34 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
     }
 
     try {
-      await save(receiptId)
+      await save(receiptId, splits)
     } catch (err) {
       setSaving(false)
       setError(friendlyError(err))
     }
   }
 
-  async function save(receiptId) {
+  async function save(receiptId, splits) {
+    if (isGroup) {
+      await groups.saveExpense(groups.groupId, {
+        id: groupExpense?.id,
+        paidBy,
+        amount,
+        currency,
+        exchangeRate: rate,
+        rateType: currency === 'USD' ? rateType : null,
+        categoryId,
+        note: note.trim(),
+        spentAt: editing && toDateInput(expense.spentAt) === date
+          ? expense.spentAt
+          : dateInputToIso(date, editing ? expense.spentAt : new Date()),
+        receiptPath: receiptId,
+        splits,
+      })
+      onDone(editing ? 'Cambios guardados en el grupo' : `Gasto cargado en ${groups.selected.group.name}`)
+      return
+    }
+
     const common = {
       currency,
       exchangeRate: rate,
@@ -241,7 +316,16 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
         <fieldset className="dest-grid">
           <legend className="sr-only">¿Dónde se guarda?</legend>
           <DestOption active={!isGroup} onClick={() => setDest('personal')} color="#5AC8FA" iconColor="#06121F" Icon={User} title="Personal" subtitle="Solo vos" />
-          <DestOption active={isGroup} onClick={() => setDest('group')} color="#A78BFA" iconColor="#14092E" Icon={Users} title={groupName} subtitle={`Lo ven ${groupSize}`} />
+          <DestOption
+            active={isGroup}
+            disabled={!canUseGroup}
+            onClick={() => (canUseGroup ? setDest('group') : onNotice(groups.selected ? 'Solo los admins del grupo pueden cargar gastos' : 'Primero creá o unite a un grupo'))}
+            color="#A78BFA"
+            iconColor="#14092E"
+            Icon={Users}
+            title={groups.selected?.group.name ?? 'Grupo'}
+            subtitle={canUseGroup ? `Lo ven ${groups.activeMembers.length}` : groups.selected ? 'Solo admins' : 'Sin grupos'}
+          />
         </fieldset>
       )}
 
@@ -304,6 +388,33 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
 
         <span className="conversion-pill glass" aria-live="polite">{conversion}</span>
       </div>
+
+      <AnimatePresence initial={false}>
+        {isGroup && canUseGroup && (
+          <motion.div
+            key="split"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={softSpring}
+            className="split-wrap"
+          >
+            <GroupSplitFields
+              members={groups.activeMembers}
+              amount={amount}
+              currency={currency}
+              paidBy={paidBy}
+              setPaidBy={setPaidBy}
+              participants={participants}
+              setParticipants={setParticipants}
+              mode={splitMode}
+              setMode={setSplitMode}
+              custom={customSplit}
+              setCustom={setCustomSplit}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {showInstallmentOption && (
         <div className="installments-box glass">
@@ -420,7 +531,7 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
         />
       </label>
 
-      <CategoryPicker value={categoryId} onChange={setCategoryId} />
+      <CategoryPicker value={categoryId} onChange={setCategoryId} defaultsOnly={isGroup} />
 
       <div className="note-row">
         <label htmlFor="note" className="sr-only">{inInstallments ? 'Qué compraste' : 'Nota'}</label>
@@ -484,7 +595,7 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
               : editing
               ? 'Guardar cambios'
               : isGroup
-                ? `Guardar en ${groupName}`
+                ? `Guardar en ${groups.selected?.group.name ?? 'el grupo'}`
                 : inInstallments ? `Guardar en ${count} cuotas` : 'Guardar en Personal'}
           </motion.span>
         </AnimatePresence>
@@ -493,11 +604,12 @@ function ExpenseForm({ expense, startInInstallments, dest, setDest, groupName, g
   )
 }
 
-function DestOption({ active, onClick, color, iconColor, Icon, title, subtitle }) {
+function DestOption({ active, disabled = false, onClick, color, iconColor, Icon, title, subtitle }) {
   return (
     <Pressable
-      className={`dest-option ${active ? 'is-active' : ''}`}
+      className={`dest-option ${active ? 'is-active' : ''} ${disabled ? 'is-disabled' : ''}`}
       aria-pressed={active}
+      aria-disabled={disabled}
       onClick={onClick}
       style={{ '--dest-color': color }}
     >

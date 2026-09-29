@@ -9,15 +9,16 @@ import { friendlyError } from '../lib/db'
 const CUSTOM_COLORS = ['#38BDF8', '#F472B6', '#34D399', '#FBBF24', '#A3E635', '#FB923C', '#C084FC', '#94A3B8']
 
 /** Category grid with a "Nueva" option to create a custom category inline. */
-export default function CategoryPicker({ value, onChange }) {
+export default function CategoryPicker({ value, onChange, defaultsOnly = false }) {
   const store = usePersonalStore()
   const [creating, setCreating] = useState(false)
+  const categories = defaultsOnly ? store.categories.filter((c) => !c.custom) : store.categories
 
   return (
     <fieldset className="cat-section">
       <legend className="section-label">Categoría</legend>
       <div className="cat-grid">
-        {store.categories.map(({ id, name, color, Icon }) => {
+        {categories.map(({ id, name, color, Icon }) => {
           const active = value === id
           return (
             <motion.button
@@ -36,17 +37,19 @@ export default function CategoryPicker({ value, onChange }) {
             </motion.button>
           )
         })}
-        <motion.button
-          type="button"
-          className="cat-option"
-          onClick={() => setCreating((v) => !v)}
-          aria-expanded={creating}
-          whileTap={{ scale: 0.9 }}
-          transition={spring}
-        >
-          <span className="cat-option-circle cat-option-new"><Plus size={22} strokeWidth={2} /></span>
-          <span className="cat-option-name">Nueva</span>
-        </motion.button>
+        {!defaultsOnly && (
+          <motion.button
+            type="button"
+            className="cat-option"
+            onClick={() => setCreating((v) => !v)}
+            aria-expanded={creating}
+            whileTap={{ scale: 0.9 }}
+            transition={spring}
+          >
+            <span className="cat-option-circle cat-option-new"><Plus size={22} strokeWidth={2} /></span>
+            <span className="cat-option-name">Nueva</span>
+          </motion.button>
+        )}
       </div>
       <AnimatePresence initial={false}>
         {creating && (

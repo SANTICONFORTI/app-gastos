@@ -8,8 +8,12 @@ import AuthScreen from './screens/AuthScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import NewPasswordScreen from './screens/NewPasswordScreen'
 import StatusScreen from './screens/StatusScreen'
+import ErrorBoundary from './components/ErrorBoundary'
+import { capturePendingInviteCode } from './lib/inviteLink'
 import './styles/global.css'
 import './styles/components.css'
+
+capturePendingInviteCode()
 
 /** Decides what to show depending on the session. */
 function Gate() {
@@ -40,9 +44,11 @@ function Gate() {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <MotionConfig reducedMotion="user">
-      <AuthProvider>
-        <Gate />
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <Gate />
+        </AuthProvider>
+      </ErrorBoundary>
     </MotionConfig>
   </StrictMode>,
 )
