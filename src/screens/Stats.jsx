@@ -5,6 +5,7 @@ import '../lib/chartSetup'
 import CategoryDoughnut from '../components/CategoryDoughnut'
 import EvolutionChart from '../components/EvolutionChart'
 import PillToggle from '../components/PillToggle'
+import WrappedButtons from '../components/WrappedButtons'
 import Pressable from '../components/Pressable'
 import { usePersonalStore } from '../store/PersonalStore'
 import useInflation from '../hooks/useInflation'
@@ -17,7 +18,7 @@ import { listContainer, listItem } from '../lib/motion'
 const pct = (n) => `${n > 0 ? '+' : ''}${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)}%`
 const MAX_CATEGORY_CHANGES = 6
 
-export default function Stats({ month, onPickMonth, onChangeMonth, onOpenCategory, onOpenExpense }) {
+export default function Stats({ month, onPickMonth, onChangeMonth, onOpenCategory, onOpenExpense, onWrapped }) {
   const store = usePersonalStore()
   const inflation = useInflation()
   const [range, setRange] = useState('6')
@@ -88,6 +89,12 @@ export default function Stats({ month, onPickMonth, onChangeMonth, onOpenCategor
           {monthName(month, { capitalize: true, short: true })} <ChevronDown size={14} strokeWidth={2.5} />
         </Pressable>
       </motion.header>
+
+      {total > 0 && (
+        <motion.div variants={listItem}>
+          <WrappedButtons month={month} onWrapped={onWrapped} />
+        </motion.div>
+      )}
 
       {total === 0 ? (
         <motion.section variants={listItem} className="card glass empty-card">

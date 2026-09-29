@@ -2378,6 +2378,189 @@ button.person-chip { min-height: 44px; border: 1px solid var(--glass-border); }
 .ant-line { font-size: 14px; line-height: 1.4; }
 .ant-line strong { color: var(--warning); }
 
+/* ---------- Stage 9: Wrapped ---------- */
+
+.wrapped-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: #03060E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wrapped-frame {
+  position: relative;
+  height: 100dvh;
+  width: min(100vw, calc(100dvh * 9 / 16));
+  overflow: hidden;
+  background:
+    radial-gradient(130% 42% at 50% -8%, var(--glow-1) 0%, var(--glow-2) 45%, var(--bg) 75%) no-repeat,
+    var(--bg);
+}
+
+@media (min-width: 600px) {
+  .wrapped-frame { height: min(100dvh, 900px); width: calc(min(100dvh, 900px) * 9 / 16); border-radius: 28px; }
+}
+
+.wrapped-progress {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  left: 12px;
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+}
+
+.wrapped-bar { flex: 1; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.22); overflow: hidden; }
+.wrapped-bar-fill { display: block; height: 100%; background: #fff; }
+.wrapped-bar-fill.is-running { width: 0; animation: wrapped-fill linear forwards; }
+@keyframes wrapped-fill { from { width: 0; } to { width: 100%; } }
+
+.wrapped-close { position: absolute; top: calc(env(safe-area-inset-top) + 26px); right: 12px; z-index: 4; }
+
+.wrapped-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: calc(420px * var(--s) - 40px * var(--s)) calc(96px * var(--s)) 0;
+  color: var(--text);
+}
+
+.wrapped-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(60% 40% at 80% 78%, color-mix(in srgb, var(--accent-slide) 30%, transparent), transparent 70%);
+}
+
+.wrapped-kicker {
+  position: relative;
+  font-size: calc(40px * var(--s));
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-slide);
+  margin-bottom: calc(40px * var(--s));
+}
+
+.wrapped-title {
+  position: relative;
+  font-size: calc(88px * var(--s));
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.wrapped-value {
+  position: relative;
+  margin-top: calc(60px * var(--s));
+  font-size: calc(150px * var(--s));
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.wrapped-rule {
+  position: relative;
+  display: block;
+  height: calc(10px * var(--s));
+  margin: calc(50px * var(--s)) 0 calc(60px * var(--s));
+  background: var(--accent-slide);
+}
+
+.wrapped-line {
+  position: relative;
+  font-size: calc(46px * var(--s));
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-2);
+  margin-bottom: calc(22px * var(--s));
+}
+
+.wrapped-list {
+  position: relative;
+  list-style: none;
+  margin: calc(30px * var(--s)) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(34px * var(--s));
+}
+
+.wrapped-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: calc(20px * var(--s));
+  row-gap: calc(12px * var(--s));
+  font-size: calc(44px * var(--s));
+  font-weight: 700;
+}
+
+.wrapped-dot { width: calc(28px * var(--s)); height: calc(28px * var(--s)); border-radius: 50%; }
+.wrapped-list-value { color: var(--text-2); }
+
+.wrapped-list-bar {
+  grid-column: 2 / -1;
+  height: calc(10px * var(--s));
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.wrapped-list-bar span { display: block; height: 100%; border-radius: 99px; }
+
+.wrapped-brand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(230px * var(--s) + 70px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.wrapped-tap { position: absolute; top: 60px; bottom: 90px; z-index: 2; border: 0; background: transparent; padding: 0; }
+.wrapped-tap-left { left: 0; width: 35%; }
+.wrapped-tap-right { right: 0; width: 65%; }
+
+.wrapped-actions {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom) + 16px);
+  z-index: 3;
+  display: flex;
+  gap: 10px;
+}
+
+.wrapped-actions > * { flex: 1 1 0; }
+
+.wrapped-promo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 18%, transparent), rgba(255, 181, 71, 0.12));
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.wrapped-promo svg { flex-shrink: 0; color: var(--accent); }
+
 /* Invisible hit area so compact buttons still get a 44px touch target. */
 .switcher-option,
 .currency-option,

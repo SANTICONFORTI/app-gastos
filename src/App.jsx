@@ -17,6 +17,7 @@ import InviteSheet from './components/InviteSheet'
 import GroupExpenseDetailSheet from './components/GroupExpenseDetailSheet'
 import { SettleSheet, SettlementDetailSheet } from './components/SettleSheet'
 import AntsSheet from './components/AntsSheet'
+import WrappedLauncher from './components/WrappedLauncher'
 import EventFormSheet from './components/EventFormSheet'
 import EventSheet from './components/EventSheet'
 import EventExpenseSheet from './components/EventExpenseSheet'
@@ -108,6 +109,8 @@ function Shell({ showToast }) {
   const [month, setMonth] = useState(monthKey())
   // Only one sheet open at a time; `sheet.type` says which.
   const [sheet, setSheet] = useState(null)
+  // Wrapped being shown: { scope: 'personal' | 'group', period: { type: 'month', key } | { type: 'year', year } }
+  const [wrapped, setWrapped] = useState(null)
 
   const direction = space === 'group' ? 1 : -1
   const activeTab = tabs[space]
@@ -184,6 +187,7 @@ function Shell({ showToast }) {
               onChangeMonth={setMonth}
               onOpenCategory={(category) => setSheet({ type: 'all', category })}
               onOpenExpense={(id) => setSheet({ type: 'detail', id })}
+              onWrapped={(period) => setWrapped({ scope: 'personal', period })}
             />
           </Suspense>
         )
@@ -200,6 +204,7 @@ function Shell({ showToast }) {
             onOpenInstallments={() => setTabs((t) => ({ ...t, personal: 'installments' }))}
             onOpenStats={() => setTabs((t) => ({ ...t, personal: 'stats' }))}
             onOpenAnts={() => setSheet({ type: 'ants' })}
+            onWrapped={(period) => setWrapped({ scope: 'personal', period })}
             onSeeAll={() => setSheet({ type: 'all' })}
             onNotice={showToast}
           />
@@ -210,7 +215,7 @@ function Shell({ showToast }) {
   const groupScreen = () => {
     switch (activeTab) {
       case 'stats':
-        return <GroupStats />
+        return <GroupStats onWrapped={(period) => setWrapped({ scope: 'group', period })} />
       case 'members':
         return (
           <GroupMembers
@@ -317,6 +322,7 @@ function Shell({ showToast }) {
       />
       <MonthPickerSheet open={sheet?.type === 'month'} value={month} onChange={setMonth} onClose={closeSheet} />
       <AntsSheet open={sheet?.type === 'ants'} month={month} onClose={closeSheet} />
+      <WrappedLauncher request={wrapped} onClose={() => setWrapped(null)} onNotice={showToast} />
       <AllMovementsSheet
         open={sheet?.type === 'all'}
         month={month}

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { DollarSign, CreditCard, Plus, BarChart3, SlidersHorizontal, ChevronDown, Receipt, PartyPopper, CalendarClock, Bug } from 'lucide-react'
+import { DollarSign, CreditCard, Plus, BarChart3, SlidersHorizontal, ChevronDown, Receipt, PartyPopper, CalendarClock, Bug, Sparkles } from 'lucide-react'
 import Amount from '../components/Amount'
 import ChipCard from '../components/ChipCard'
 import CategoryIcon from '../components/CategoryIcon'
@@ -19,7 +19,7 @@ import { listContainer, listItem } from '../lib/motion'
 const MAX_SEGMENTS = 5
 const RECENT_COUNT = 5
 
-export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onOpenPlan, onOpenInstallments, onOpenStats, onOpenAnts, onSeeAll, onNotice }) {
+export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense, onOpenPlan, onOpenInstallments, onOpenStats, onOpenAnts, onWrapped, onSeeAll, onNotice }) {
   const store = usePersonalStore()
   const rates = useDollarRates()
   const nextMonth = shiftMonth(monthKey(), 1)
@@ -62,6 +62,32 @@ export default function PersonalHome({ month, onPickMonth, onAdd, onOpenExpense,
       </motion.section>
 
       <LocalImportCard onNotice={onNotice} />
+
+      {(() => {
+        // First days of the month: offer last month's Wrapped. Dec 15 - Jan 15: the year's.
+        const today = new Date()
+        const prev = shiftMonth(monthKey(today), -1)
+        const yearly = (today.getMonth() === 11 && today.getDate() >= 15) || (today.getMonth() === 0 && today.getDate() <= 15)
+        const year = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear()
+        const prevHasData = monthTotal(store.expenses, prev) > 0
+        if (yearly) {
+          return (
+            <motion.button variants={listItem} type="button" className="wrapped-promo" onClick={() => onWrapped({ type: 'year', year })}>
+              <Sparkles size={20} strokeWidth={2.2} aria-hidden="true" />
+              <span><strong>Tu {year} en Puly</strong> ya está listo. Mirá tu año y compartilo.</span>
+            </motion.button>
+          )
+        }
+        if (today.getDate() <= 7 && prevHasData) {
+          return (
+            <motion.button variants={listItem} type="button" className="wrapped-promo" onClick={() => onWrapped({ type: 'month', key: prev })}>
+              <Sparkles size={20} strokeWidth={2.2} aria-hidden="true" />
+              <span><strong>Tu Wrapped de {monthName(prev)}</strong> está listo. Mirá cómo te fue y compartilo.</span>
+            </motion.button>
+          )
+        }
+        return null
+      })()}
 
       <motion.div variants={listItem} className="chip-grid">
         {rateChip('blue', 'Dólar blue', '#4ADE80', DollarSign)}

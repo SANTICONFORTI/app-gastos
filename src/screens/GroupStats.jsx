@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Amount from '../components/Amount'
 import Pressable from '../components/Pressable'
 import ProgressBar from '../components/ProgressBar'
+import WrappedButtons from '../components/WrappedButtons'
 import UserAvatar from '../components/UserAvatar'
 import { useGroups } from '../store/GroupsStore'
 import { usePersonalStore } from '../store/PersonalStore'
@@ -13,7 +14,7 @@ import { groupExpenseArs } from '../lib/groupMath'
 import { listContainer, listItem } from '../lib/motion'
 
 /** Month summary for the group: by category, who paid, and each one's share. */
-export default function GroupStats() {
+export default function GroupStats({ onWrapped }) {
   const groups = useGroups()
   const store = usePersonalStore()
   const [month, setMonth] = useState(monthKey())
@@ -65,6 +66,9 @@ export default function GroupStats() {
         <motion.p variants={listItem} className="empty-text">No hay gastos del grupo en este mes.</motion.p>
       ) : (
         <>
+          <motion.div variants={listItem}>
+            <WrappedButtons month={month} onWrapped={onWrapped} />
+          </motion.div>
           <motion.section variants={listItem} className="card glass stats-card" aria-labelledby="gcat-title">
             <h2 id="gcat-title" className="card-title">Por categoría</h2>
             <ul className="bar-list">
