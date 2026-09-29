@@ -2605,6 +2605,28 @@ button.person-chip { min-height: 44px; border: 1px solid var(--glass-border); }
 .reminder-row.budget-near .reminder-icon { color: var(--warning); }
 .reminder-row.budget-over .reminder-icon { color: #FF9AAA; }
 
+/* Printable report (PDF export): hidden on screen, the only thing printed. */
+#print-root { display: none; }
+
+@media print {
+  body { background: #fff !important; }
+  body > *:not(#print-root) { display: none !important; }
+  #print-root {
+    display: block;
+    color: #111;
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 11pt;
+  }
+  #print-root h1 { font-size: 20pt; margin-bottom: 4pt; }
+  #print-root h2 { font-size: 14pt; margin: 16pt 0 6pt; }
+  #print-root p { color: #444; margin: 0 0 6pt; }
+  #print-root table { width: 100%; border-collapse: collapse; }
+  #print-root th, #print-root td { text-align: left; padding: 4pt 6pt; border-bottom: 1px solid #ddd; }
+  #print-root td:last-child, #print-root th:last-child { text-align: right; }
+  #print-root tr.voided td { color: #999; text-decoration: line-through; }
+  #print-root .print-brand { margin-top: 18pt; font-size: 9pt; color: #888; }
+}
+
 /* Invisible hit area so compact buttons still get a 44px touch target. */
 .switcher-option,
 .currency-option,

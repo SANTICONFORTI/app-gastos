@@ -1,8 +1,9 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  LayoutGrid, Bell, Home, BarChart3, CreditCard, UserRound, Users, History, Target, Gauge, Repeat,
+  LayoutGrid, Bell, Home, BarChart3, CreditCard, UserRound, Users, History, Target, Gauge, Repeat, FileDown,
 } from 'lucide-react'
+import ExportSheet from './components/ExportSheet'
 import MenuSheet from './components/MenuSheet'
 import GoalsSheet from './components/GoalsSheet'
 import BudgetsSheet from './components/BudgetsSheet'
@@ -160,6 +161,7 @@ function Shell({ showToast }) {
     { id: 'goals', title: 'Metas de ahorro', subtitle: 'Juntá para algo y mirá cómo avanza', Icon: Target, color: '#4ADE80', onClick: () => setSheet({ type: 'goals' }) },
     { id: 'budgets', title: 'Presupuestos', subtitle: 'Un tope por categoría, con aviso', Icon: Gauge, color: '#FFB547', onClick: () => setSheet({ type: 'budgets' }) },
     { id: 'recurring', title: 'Gastos fijos', subtitle: 'Alquiler, suscripciones: se cargan solos', Icon: Repeat, color: '#8B93FF', onClick: () => setSheet({ type: 'recurring' }) },
+    { id: 'export', title: 'Exportar', subtitle: 'Tus gastos en Excel o PDF', Icon: FileDown, color: '#5AC8FA', onClick: () => setSheet({ type: 'export' }) },
   ]
 
   function openBell() {
@@ -341,6 +343,7 @@ function Shell({ showToast }) {
       <GoalsSheet open={sheet?.type === 'goals'} onClose={closeSheet} onNotice={showToast} />
       <BudgetsSheet open={sheet?.type === 'budgets'} onClose={closeSheet} onNotice={showToast} />
       <RecurringSheet open={sheet?.type === 'recurring'} onClose={closeSheet} onNotice={showToast} />
+      <ExportSheet open={sheet?.type === 'export'} month={month} onClose={closeSheet} onNotice={showToast} />
       <AllMovementsSheet
         open={sheet?.type === 'all'}
         month={month}
